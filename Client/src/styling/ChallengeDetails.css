@@ -1,0 +1,229 @@
+.challenge-details {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem 0;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 2rem;
+  color: #2e7d32;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.back-link:hover {
+  color: #1b5e20;
+  text-decoration: underline;
+}
+
+.challenge-header {
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.challenge-badge {
+  display: inline-block;
+  padding: 0.3rem 1rem;
+  border-radius: 20px;
+  color: white;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.challenge-badge.waste-reduction {
+  background-color: #388e3c;
+}
+
+.challenge-badge.sustainable-transport {
+  background-color: #0288d1;
+}
+
+.challenge-badge.ethical-consumption {
+  background-color: #f57c00;
+}
+
+.challenge-badge.energy-conservation {
+  background-color: #7cb342;
+}
+
+.challenge-details h2 {
+  font-size: 2rem;
+  margin: 0.5rem 0;
+  color: #2e7d32;
+}
+
+.challenge-status {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.badge {
+  padding: 0.3rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.badge.active {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.badge.upcoming {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.badge.ended {
+  background-color: #f5f5f5;
+  color: #757575;
+}
+
+.challenge-info {
+  display: flex;
+  gap: 2rem;
+  margin: 2rem 0;
+  padding: 1.5rem;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: 0.9rem;
+  color: #757575;
+}
+
+.value {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #424242;
+  margin-top: 0.3rem;
+}
+
+.value.points {
+  color: #2e7d32;
+}
+
+.challenge-description {
+  margin: 2rem 0;
+}
+
+.challenge-description h3 {
+  color: #2e7d32;
+  margin-bottom: 1rem;
+}
+
+.challenge-description p {
+  color: #424242;
+  line-height: 1.6;
+}
+
+.challenge-activities {
+  margin: 2rem 0;
+}
+
+.challenge-activities h3 {
+  color: #2e7d32;
+  margin-bottom: 1rem;
+}
+
+.activities-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.activity-item {
+  padding: 1rem;
+  border-left: 3px solid #81c784;
+  background-color: #fafafa;
+  margin-bottom: 1rem;
+}
+
+.activity-item:last-child {
+  margin-bottom: 0;
+}
+
+.activity-item h4 {
+  margin: 0;
+  color: #2e7d32;
+  font-size: 1.1rem;
+}
+
+.activity-item p {
+  margin: 0.5rem 0;
+  color: #616161;
+}
+
+.activity-points {
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.challenge-actions {
+  margin: 2rem 0;
+  display: flex;
+  justify-content: center;
+}
+
+.join-challenge-btn {
+  padding: 0.8rem 2rem;
+  background-color: #2e7d32;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.join-challenge-btn:hover {
+  background-color: #1b5e20;
+}
+
+.already-joined {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 2rem;
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.joined-icon {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.loading, .error, .not-found {
+  text-align: center;
+  padding: 2rem;
+  color: #616161;
+}
+
+.error {
+  color: #d32f2f;
+}
+
+@media (max-width: 768px) {
+  .challenge-info {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .challenge-status {
+    position: relative;
+    margin-top: 1rem;
+  }
+}

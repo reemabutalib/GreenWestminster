@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import './ActiveChallenges.css';
+import './styling/ActiveChallenges.css';
 
 const ActiveChallenges = ({ userId }) => {
   const [challenges, setChallenges] = useState([]);

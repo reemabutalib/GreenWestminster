@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import './DailyActivities.css';
+import './styling/DailyActivities.css';
 
 const DailyActivities = ({ userId }) => {
   const [activities, setActivities] = useState([]);

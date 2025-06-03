@@ -2,13 +2,13 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
 
 // Import components
-import Navigation from './components/common/Navigation';
-import Dashboard from './components/dashboard/Dashboard';
-import ActivitiesPage from './components/activities/ActivitiesPage';
-import ChallengesPage from './components/challenges/ChallengesPage';
-import ChallengeDetails from './components/challenges/ChallengeDetails';
-import LeaderboardPage from './components/leaderboard/LeaderboardPage';
-import ProfilePage from './components/profile/ProfilePage';
+import Navigation from './components/Navigation';
+import Dashboard from './components/Dashboard';
+import ActivitiesPage from './components/ActivitiesPage';
+import ChallengesPage from './components/ChallengesPage';
+import ChallengeDetails from './components/ChallengeDetails';
+import LeaderboardPage from './components/LeaderboardPage';
+import ProfilePage from './components/ProfilePage';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 

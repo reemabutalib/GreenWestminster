@@ -1,4 +1,4 @@
-import './StreakCounter.css';
+import './styling/StreakCounter.css';
 
 const StreakCounter = ({ streak }) => {
   return (

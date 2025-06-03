@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import './ActivityCard.css';
+import './styling/ActivityCard.css';
 
 const ActivityCard = ({ activity, userId }) => {
   const [isCompleted, setIsCompleted] = useState(false);

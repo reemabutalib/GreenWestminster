@@ -1,0 +1,71 @@
+.streak-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  min-width: 80px;
+  position: relative;
+}
+
+.streak-value {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #2e7d32;
+  line-height: 1;
+}
+
+.streak-label {
+  font-size: 0.8rem;
+  color: #616161;
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+}
+
+.streak-flame {
+  margin-left: 0.25rem;
+  font-size: 1rem;
+}
+
+/* Custom animations for the streak flame */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  25% { opacity: 0.8; }
+  50% { opacity: 0.9; }
+  75% { opacity: 0.7; }
+}
+
+.streak-flame {
+  animation: flicker 1.5s infinite;
+}
+
+/* Special styling for higher streaks */
+.streak-counter[data-streak="7"] .streak-value,
+.streak-counter[data-streak="14"] .streak-value,
+.streak-counter[data-streak="30"] .streak-value,
+.streak-counter[data-streak="100"] .streak-value {
+  color: #f57c00;
+}
+
+.streak-counter[data-streak="7"] .streak-flame,
+.streak-counter[data-streak="14"] .streak-flame,
+.streak-counter[data-streak="30"] .streak-flame,
+.streak-counter[data-streak="100"] .streak-flame {
+  font-size: 1.2rem;
+}
+
+.streak-counter[data-streak="100"] .streak-flame {
+  font-size: 1.4rem;
+}
+
+@media (max-width: 768px) {
+  .streak-counter {
+    padding: 0.4rem 0.75rem;
+  }
+  
+  .streak-value {
+    font-size: 1.5rem;
+  }
+}

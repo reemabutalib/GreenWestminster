@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import './Dashboard.css';
+import './styling/Dashboard.css';
 import StreakCounter from './StreakCounter';
 import DailyActivities from './DailyActivities';
 import ActiveChallenges from './ActiveChallenges';
