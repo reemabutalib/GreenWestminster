@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import './styling/ProfilePage.css';
+import '../styling/ProfilePage.css';
 
 const ProfilePage = () => {
   const [user, setUser] = useState(null);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import './styling/ChallengesPage.css';
+import '../styling/ChallengesPage.css';
 
 const ChallengesPage = () => {
   const [challenges, setChallenges] = useState([]);
@@ -21,12 +21,23 @@ const ChallengesPage = () => {
         const endpoint = activeTab === 'active' 
           ? '/api/challenges/active'
           : '/api/challenges';
-          
+        
+        console.log(`Fetching from endpoint: ${endpoint}`);  
         const response = await fetch(endpoint);
         
-        if (!response.ok) {
-          throw new Error(`Failed to fetch challenges: ${response.status}`);
-        }
+         if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API error response:', errorText);
+        throw new Error(`Failed to fetch challenges: ${response.status} ${response.statusText}`);
+      }
+
+      // Check content type to make sure we're getting JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Expected JSON response but got:', text.substring(0, 200) + '...');
+        throw new Error('Invalid response format from server');
+      }
         
         let data = await response.json();
         
@@ -45,6 +56,7 @@ const ChallengesPage = () => {
           }
           
           data = await completedResponse.json();
+          
         }
         
         setChallenges(data);

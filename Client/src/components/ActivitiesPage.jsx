@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import './styling/ActivitiesPage.css';
+import '../styling/ActivitiesPage.css';
 import ActivityCard from './ActivityCard';
 
 const ActivitiesPage = () => {

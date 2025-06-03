@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import './styling/Auth.css';
+import '../../styling/Auth.css';
 
 const Login = () => {
   const navigate = useNavigate();

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import './styling/ChallengeDetails.css';
+import '../styling/ChallengeDetails.css';
 
 const ChallengeDetails = () => {
   const { id } = useParams();
