@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/UserContext';
 import '../../styling/Auth.css';
 
 const Register = () => {
+  const { register } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: '',
@@ -61,26 +63,18 @@ const Register = () => {
       setServerError('');
       
       try {
-        const response = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            username: formData.username,
-            email: formData.email,
-            password: formData.password
-          }),
-        });
+        const result = await register(
+          formData.username,
+          formData.email,
+          formData.password
+        );
         
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.message || 'Registration failed');
+        if (result.success) {
+          // Redirect to login page on successful registration
+          navigate('/login', { state: { registered: true } });
+        } else {
+          setServerError(result.error || 'Registration failed');
         }
-        
-        // Redirect to login page on successful registration
-        navigate('/login', { state: { registered: true } });
       } catch (error) {
         setServerError(error.message || 'An error occurred during registration');
       } finally {

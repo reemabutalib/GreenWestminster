@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/UserContext';
 import '../../styling/Auth.css';
 
 const Login = () => {
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [formData, setFormData] = useState({
@@ -13,14 +15,6 @@ const Login = () => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState('');
-  const [registrationSuccess, setRegistrationSuccess] = useState(false);
-
-  // Check if user just registered
-  useEffect(() => {
-    if (location.state?.registered) {
-      setRegistrationSuccess(true);
-    }
-  }, [location.state]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -58,30 +52,16 @@ const Login = () => {
       setServerError('');
       
       try {
-        const response = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password
-          }),
-        });
+        const result = await login(formData.email, formData.password);
         
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.message || 'Login failed');
+        if (result.success) {
+          // Redirect to dashboard
+          navigate('/dashboard');
+        } else {
+          setServerError(result.error || 'Failed to login');
         }
-        
-        // Store token in localStorage
-        localStorage.setItem('token', data.token);
-        
-        // Redirect to dashboard
-        navigate('/dashboard');
       } catch (error) {
-        setServerError(error.message || 'Invalid email or password');
+        setServerError(error.message || 'An error occurred during login');
       } finally {
         setIsSubmitting(false);
       }
@@ -96,7 +76,7 @@ const Login = () => {
           <p>Log in to continue your sustainability journey</p>
         </div>
         
-        {registrationSuccess && (
+        {location.state?.registered && (
           <div className="success-message">
             Registration successful! Please log in with your credentials.
           </div>

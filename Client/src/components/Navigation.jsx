@@ -1,49 +1,61 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import '../styling/Navigation.css';
+import Logout from './auth/Logout';
 
 const Navigation = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const location = useLocation();
   
+  useEffect(() => {
+    // Check if user is logged in by looking for token
+    const token = localStorage.getItem('token');
+    setIsLoggedIn(!!token);
+  }, [location]); // Re-check when location changes (after login/logout)
+
   return (
-    <nav className="navigation">
-      <div className="nav-brand">
-        <Link to="/">
-          <h1>Green Westminster</h1>
+    <nav className="nav-container">
+      <div className="nav-logo">
+        <Link to="/">Green Westminster</Link>
+      </div>
+      
+      <div className="nav-links">
+        <Link to="/dashboard" className={location.pathname === '/dashboard' ? 'active' : ''}>
+          Dashboard
+        </Link>
+        <Link to="/activities" className={location.pathname === '/activities' ? 'active' : ''}>
+          Activities
+        </Link>
+        <Link to="/challenges" className={location.pathname === '/challenges' ? 'active' : ''}>
+          Challenges
+        </Link>
+        <Link to="/leaderboard" className={location.pathname === '/leaderboard' ? 'active' : ''}>
+          Leaderboard
         </Link>
       </div>
       
-      <div className="nav-toggle" onClick={() => setIsOpen(!isOpen)}>
-        <span className="hamburger"></span>
+      <div className="nav-auth">
+        {isLoggedIn ? (
+          <>
+            <Link to="/profile" className="profile-link">
+              <div className="profile-icon">
+                <i className="fa fa-user"></i>
+              </div>
+              Profile
+            </Link>
+            <Logout />
+          </>
+        ) : (
+          <>
+            <Link to="/login" className="login-btn">
+              Login
+            </Link>
+            <Link to="/register" className="register-btn">
+              Register
+            </Link>
+          </>
+        )}
       </div>
-      
-      <ul className={`nav-menu ${isOpen ? 'active' : ''}`}>
-        <li>
-          <Link to="/dashboard" className="nav-link" onClick={() => setIsOpen(false)}>
-            Dashboard
-          </Link>
-        </li>
-        <li>
-          <Link to="/activities" className="nav-link" onClick={() => setIsOpen(false)}>
-            Activities
-          </Link>
-        </li>
-        <li>
-          <Link to="/challenges" className="nav-link" onClick={() => setIsOpen(false)}>
-            Challenges
-          </Link>
-        </li>
-        <li>
-          <Link to="/leaderboard" className="nav-link" onClick={() => setIsOpen(false)}>
-            Leaderboard
-          </Link>
-        </li>
-        <li>
-          <Link to="/profile" className="nav-link" onClick={() => setIsOpen(false)}>
-            Profile
-          </Link>
-        </li>
-      </ul>
     </nav>
   );
 };

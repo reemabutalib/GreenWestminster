@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 
 // Import components
@@ -12,7 +12,25 @@ import ProfilePage from './components/ProfilePage';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 
-function App() {
+// Import auth context
+import { AuthProvider, useAuth } from './context/UserContext';
+
+// Protected route component
+const ProtectedRoute = ({ children }) => {
+  const { currentUser, loading } = useAuth();
+  
+  if (loading) {
+    return <div className="loading-auth">Authenticating...</div>;
+  }
+  
+  if (!currentUser) {
+    return <Navigate to="/login" />;
+  }
+  
+  return children;
+};
+
+function AppContent() {
   return (
     <Router>
       <div className="app">
@@ -20,19 +38,54 @@ function App() {
         
         <main className="main-content">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/activities" element={<ActivitiesPage />} />
-            <Route path="/challenges" element={<ChallengesPage />} />
-            <Route path="/challenges/:id" element={<ChallengeDetails />} />
-            <Route path="/leaderboard" element={<LeaderboardPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
+            {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
+            
+            {/* Protected routes */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/activities" element={
+              <ProtectedRoute>
+                <ActivitiesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/challenges" element={
+              <ProtectedRoute>
+                <ChallengesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/challenges/:id" element={
+              <ProtectedRoute>
+                <ChallengeDetails />
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            } />
           </Routes>
         </main>
       </div>
     </Router>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
