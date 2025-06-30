@@ -13,7 +13,7 @@ import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 
 // Import auth context
-import { AuthProvider, useAuth } from './context/UserContext';
+import { AuthProvider, useAuth } from './components/context/UserContext';
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/UserContext';
+import { useAuth } from '../context/UserContext';
 import '../../styling/Auth.css';
 
 const Register = () => {

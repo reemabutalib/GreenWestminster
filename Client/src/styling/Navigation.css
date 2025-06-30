@@ -101,4 +101,90 @@
     display: block;
     padding: 1rem;
   }
+
+  
+.nav-auth {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #2e7d32;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.profile-link:hover {
+  background-color: #e8f5e9;
+}
+
+.profile-icon {
+  width: 30px;
+  height: 30px;
+  background-color: #e8f5e9;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2e7d32;
+}
+
+.login-btn, .register-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.login-btn {
+  color: #2e7d32;
+  border: 1px solid #2e7d32;
+}
+
+.login-btn:hover {
+  background-color: #e8f5e9;
+}
+
+.register-btn {
+  background-color: #2e7d32;
+  color: white;
+}
+
+.register-btn:hover {
+  background-color: #1b5e20;
+}
+
+.logout-btn {
+  padding: 0.5rem 1rem;
+  background-color: transparent;
+  color: #d32f2f;
+  border: 1px solid #d32f2f;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.logout-btn:hover {
+  background-color: #ffebee;
+}
+
+@media (max-width: 768px) {
+  .nav-auth {
+    gap: 0.5rem;
+  }
+  
+  .login-btn, .register-btn, .logout-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+  }
+}
 }

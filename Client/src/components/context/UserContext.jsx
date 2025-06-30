@@ -88,29 +88,42 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (username, email, password) => {
-    setAuthError(null);
+  setAuthError(null);
+  
+  try {
+    console.log('Sending registration data:', { username, email });
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, email, password }),
+    });
     
+    // Try to get the response text first
+    const responseText = await response.text();
+    console.log('Raw server response:', responseText);
+
+    // Then try to parse it as JSON if possible
+    let data;
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, email, password }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Registration failed');
-      }
-      
-      return { success: true };
+      data = JSON.parse(responseText);
     } catch (error) {
-      setAuthError(error.message);
-      return { success: false, error: error.message };
+      console.error('Failed to parse response as JSON:', responseText, error); // Add error to the log
+      throw new Error(`Server returned an invalid response format: ${error.message}`);
     }
-  };
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Registration failed');
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Registration error:', error);
+    setAuthError(error.message);
+    return { success: false, error: error.message };
+  }
+};
 
   const logout = () => {
     localStorage.removeItem('token');
