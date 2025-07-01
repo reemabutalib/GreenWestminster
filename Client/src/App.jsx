@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import './App.css';
 
 // Import components
+import HomePage from './components/HomePage';
 import Navigation from './components/Navigation';
 import Dashboard from './components/Dashboard';
 import ActivitiesPage from './components/ActivitiesPage';
@@ -39,6 +40,7 @@ function AppContent() {
         <main className="main-content">
           <Routes>
             {/* Public routes */}
+            <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />

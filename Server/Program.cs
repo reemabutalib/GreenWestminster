@@ -55,8 +55,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseCors("AllowReactApp");
-
+app.UseCors(policy => 
+    policy.WithOrigins("http://localhost:5173")
+        .AllowAnyMethod()
+        .AllowAnyHeader());
 app.UseAuthorization();
 
 app.MapControllers();

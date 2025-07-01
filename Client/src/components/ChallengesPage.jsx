@@ -10,8 +10,13 @@ const ChallengesPage = () => {
   
   // For demo purposes - hardcoded user ID
   const userId = 1;
+  
+  // Add this for debugging
+  console.log('ChallengesPage rendering, challenges:', challenges, 'loading:', loading, 'error:', error);
 
   useEffect(() => {
+    console.log('ChallengesPage component mounted');
+    
     const fetchChallenges = async () => {
       setLoading(true);
       setError(null);
@@ -22,24 +27,34 @@ const ChallengesPage = () => {
           ? '/api/challenges/active'
           : '/api/challenges';
         
-        console.log(`Fetching from endpoint: ${endpoint}`);  
-        const response = await fetch(endpoint);
+        console.log(`Fetching from endpoint: ${endpoint}`);
         
-         if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API error response:', errorText);
-        throw new Error(`Failed to fetch challenges: ${response.status} ${response.statusText}`);
-      }
+        // Add API_BASE_URL to ensure correct endpoint
+        const API_BASE_URL = 'http://localhost:5138'; // Update with your server port
+        const fullUrl = `${API_BASE_URL}${endpoint}`;
+        console.log(`Full request URL: ${fullUrl}`);
+        
+        const response = await fetch(fullUrl);
+        
+        console.log('Response status:', response.status);
+        console.log('Response headers:', Object.fromEntries([...response.headers]));
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('API error response:', errorText);
+          throw new Error(`Failed to fetch challenges: ${response.status} ${response.statusText}`);
+        }
 
-      // Check content type to make sure we're getting JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('Expected JSON response but got:', text.substring(0, 200) + '...');
-        throw new Error('Invalid response format from server');
-      }
-        
+        // Check content type to make sure we're getting JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.error('Expected JSON response but got:', text.substring(0, 200) + '...');
+          throw new Error('Invalid response format from server');
+        }
+          
         let data = await response.json();
+        console.log('Challenges data received:', data);
         
         // If we're on the upcoming tab, filter out active challenges
         if (activeTab === 'upcoming') {
@@ -49,14 +64,19 @@ const ChallengesPage = () => {
         
         // If we're on the completed tab, fetch user's completed challenges
         if (activeTab === 'completed') {
-          const completedResponse = await fetch(`/api/users/${userId}/challenges/completed`);
-          
-          if (!completedResponse.ok) {
-            throw new Error('Failed to fetch completed challenges');
+          try {
+            const completedResponse = await fetch(`/api/users/${userId}/challenges/completed`);
+            
+            if (!completedResponse.ok) {
+              console.warn('Failed to fetch completed challenges, using empty array');
+              data = [];
+            } else {
+              data = await completedResponse.json();
+            }
+          } catch (err) {
+            console.error('Error fetching completed challenges:', err);
+            data = [];
           }
-          
-          data = await completedResponse.json();
-          
         }
         
         setChallenges(data);
@@ -70,6 +90,7 @@ const ChallengesPage = () => {
     
     fetchChallenges();
   }, [activeTab, userId]);
+  
   
   const handleJoinChallenge = async (challengeId) => {
     try {
