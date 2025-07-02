@@ -1,0 +1,47 @@
+# Root-level ignores
+*.log
+*.env
+.env.*.local
+.DS_Store
+node_modules/
+dist/
+build/
+
+# Ignore SQLite database if generated locally
+*.db
+*.sqlite
+
+# Ignore OS/system files
+Thumbs.db
+ehthumbs.db
+desktop.ini
+.vscode/
+
+# Client (React frontend)
+client/node_modules/
+client/.env
+client/dist/
+client/build/
+client/.DS_Store
+
+# Server (.NET backend)
+server/bin/
+server/obj/
+server/.vs/
+server/*.db
+server/*.sqlite
+server/appsettings.*.json
+server/*.user
+server/.vscode/
+
+# Avoid uploading secrets or credentials
+secrets/
+*.pfx
+*.key
+*.crt
+*.pem
+*.cert
+
+# Optional Render build cache
+render-build/
+
