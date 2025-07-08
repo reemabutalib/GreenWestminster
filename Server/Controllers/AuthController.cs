@@ -9,6 +9,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 using BC = BCrypt.Net.BCrypt;
 
 namespace Server.Controllers
@@ -50,6 +51,9 @@ namespace Server.Controllers
             Username = registerDto.Username,
             Email = registerDto.Email,
             Password = BC.HashPassword(registerDto.Password),
+            Course = registerDto.Course,
+            YearOfStudy = registerDto.YearOfStudy,
+            AccommodationType = registerDto.AccommodationType,
             JoinDate = DateTime.UtcNow,
             LastActivityDate = DateTime.UtcNow
         };
@@ -134,11 +138,32 @@ namespace Server.Controllers
 
     // DTOs for authentication
     public class RegisterDto
-    {
-        public string Username { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-    }
+{
+    [Required]
+    public string Username { get; set; } = string.Empty;
+    
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+    
+    [Required]
+    [MinLength(6)]
+    public string Password { get; set; } = string.Empty;
+    
+    [Required]
+    [Compare("Password")]
+    public string ConfirmPassword { get; set; } = string.Empty;
+    
+    [Required]
+    public string Course { get; set; } = string.Empty;
+    
+    [Required]
+    [Range(1, 6)]
+    public int YearOfStudy { get; set; } = 1;
+    
+    [Required]
+    public string AccommodationType { get; set; } = string.Empty;
+}
 
     public class LoginDto
     {

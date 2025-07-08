@@ -2,7 +2,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 2rem;
+  padding: 0.6rem 2rem;
   background-color: #f0f8f0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -184,24 +184,37 @@
   }
   
   .nav-auth {
-    gap: 0.5rem;
-  }
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-left: auto; /* This pushes it to the right */
+  margin-right: 10px;
+}
   
   .login-btn, .register-btn, .logout-btn {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.9rem;
-  }
+   padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+}
 }
 
 /* Additional styles for better spacing and alignment */
 .nav-container {
   width: 100%;
-  position: fixed; /* Change from sticky to fixed */
+  position: fixed;
   top: 0;
   left: 0;
   z-index: 100;
-  background-color: #f0f8f0; /* Add background color */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Add shadow for better separation */
+  background-color: #f0f8f0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex; /* Add flex display */
+  justify-content: space-between; /* Space between elements */
+  align-items: center; /* Center items vertically */
+  padding: 0.6rem 1.2rem 0,6rem 2rem; /* Reduce padding to make it thinner */
+  height: 60px; /* Set a fixed height */
 }
 
 .nav-links {
@@ -210,8 +223,12 @@
   gap: 1.5rem;
 }
 
+.main-content {
+  padding-top: 60px; /* Match the height of navbar */
+}
+
 /* Fix for link spacing */
 .nav-links a {
-  padding: 0.7rem 1rem;
+  padding: 0.5rem 0.8rem; /* Slightly reduced padding */
   display: inline-block;
 }

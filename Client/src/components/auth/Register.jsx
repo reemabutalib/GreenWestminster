@@ -10,7 +10,10 @@ const Register = () => {
     username: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    course: '',
+    yearOfStudy: 1,
+    accommodationType: ''
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,6 +54,19 @@ const Register = () => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
     
+    // Validate new fields
+    if (!formData.course.trim()) {
+      newErrors.course = 'Course is required';
+    }
+    
+    if (!formData.yearOfStudy) {
+      newErrors.yearOfStudy = 'Year of study is required';
+    }
+    
+    if (!formData.accommodationType) {
+      newErrors.accommodationType = 'Accommodation type is required';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -66,7 +82,10 @@ const Register = () => {
         const result = await register(
           formData.username,
           formData.email,
-          formData.password
+          formData.password,
+          formData.course,
+          formData.yearOfStudy,
+          formData.accommodationType
         );
         
         if (result.success) {
@@ -144,6 +163,55 @@ const Register = () => {
               placeholder="Confirm your password"
             />
             {errors.confirmPassword && <span className="error-message">{errors.confirmPassword}</span>}
+          </div>
+          
+          {/* New student-specific fields */}
+          <div className="form-group">
+            <label htmlFor="course">Course</label>
+            <input
+              type="text"
+              id="course"
+              name="course"
+              value={formData.course}
+              onChange={handleChange}
+              placeholder="e.g. Computer Science"
+            />
+            {errors.course && <span className="error-message">{errors.course}</span>}
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="yearOfStudy">Year of Study</label>
+            <select
+              id="yearOfStudy"
+              name="yearOfStudy"
+              value={formData.yearOfStudy}
+              onChange={handleChange}
+            >
+              <option value="1">1st Year</option>
+              <option value="2">2nd Year</option>
+              <option value="3">3rd Year</option>
+              <option value="4">4th Year</option>
+              <option value="5">5th Year</option>
+              <option value="6">Postgraduate</option>
+            </select>
+            {errors.yearOfStudy && <span className="error-message">{errors.yearOfStudy}</span>}
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="accommodationType">Accommodation Type</label>
+            <select
+              id="accommodationType"
+              name="accommodationType"
+              value={formData.accommodationType}
+              onChange={handleChange}
+            >
+              <option value="">Select accommodation type</option>
+              <option value="University Halls">University Halls</option>
+              <option value="Private Accommodation">Private Accommodation</option>
+              <option value="Family Home">Family Home</option>
+              <option value="Other">Other</option>
+            </select>
+            {errors.accommodationType && <span className="error-message">{errors.accommodationType}</span>}
           </div>
           
           <button 
