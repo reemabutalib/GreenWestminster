@@ -27,8 +27,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 // Configure JWT authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -52,9 +50,9 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.UseHttpsRedirection();
 }
 
-app.UseHttpsRedirection();
 app.UseCors(policy => 
     policy.WithOrigins("http://localhost:5173")
         .AllowAnyMethod()
@@ -85,6 +83,7 @@ app.MapGet("/weatherforecast", () =>
 .WithName("GetWeatherForecast")
 .WithOpenApi();
 
+app.Urls.Add("http://*:80");
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
