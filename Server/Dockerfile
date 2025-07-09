@@ -11,11 +11,12 @@ WORKDIR /src
 COPY . .
 
 # Restore and publish
-RUN dotnet restore
-RUN dotnet publish -c Release -o /app/publish
+RUN dotnet restore Server.csproj
+RUN dotnet publish Server.csproj -c Release -o /app/publish
 
 # Final stage
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
-ENTRYPOINT ["dotnet", "GreenWestminster.Server.dll"]
+ENTRYPOINT ["dotnet", "Server.dll"]
+
