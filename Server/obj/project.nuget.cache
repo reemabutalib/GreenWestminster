@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "UlnUll8VCByhgrEwJLPXE3q11FGATKpH8rY/p1kQfSOXUWRbvb3U3o4h5ea0v/yrFZTE1uriyUh3qijOUK9H8w==",
+  "dgSpecHash": "eyuqEYZqJ0qOgR9ozVje9TA1B8Xra+tXLI9yokxUi70aZlKFLUWAAjrVeC3Gij2NU3Uf65VMWcjdfAONwfM3eA==",
   "success": true,
   "projectFilePath": "/Users/reemabutalib/GreenWestminster/Server/Server.csproj",
   "expectedPackageFiles": [
@@ -45,6 +45,8 @@
     "/Users/reemabutalib/.nuget/packages/microsoft.identitymodel.tokens/8.12.1/microsoft.identitymodel.tokens.8.12.1.nupkg.sha512",
     "/Users/reemabutalib/.nuget/packages/microsoft.openapi/1.6.14/microsoft.openapi.1.6.14.nupkg.sha512",
     "/Users/reemabutalib/.nuget/packages/mono.texttemplating/3.0.0/mono.texttemplating.3.0.0.nupkg.sha512",
+    "/Users/reemabutalib/.nuget/packages/npgsql/9.0.3/npgsql.9.0.3.nupkg.sha512",
+    "/Users/reemabutalib/.nuget/packages/npgsql.entityframeworkcore.postgresql/9.0.4/npgsql.entityframeworkcore.postgresql.9.0.4.nupkg.sha512",
     "/Users/reemabutalib/.nuget/packages/sqlitepclraw.bundle_e_sqlite3/2.1.10/sqlitepclraw.bundle_e_sqlite3.2.1.10.nupkg.sha512",
     "/Users/reemabutalib/.nuget/packages/sqlitepclraw.core/2.1.10/sqlitepclraw.core.2.1.10.nupkg.sha512",
     "/Users/reemabutalib/.nuget/packages/sqlitepclraw.lib.e_sqlite3/2.1.10/sqlitepclraw.lib.e_sqlite3.2.1.10.nupkg.sha512",
