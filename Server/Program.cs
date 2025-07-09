@@ -84,6 +84,14 @@ app.MapGet("/weatherforecast", () =>
 .WithOpenApi();
 
 app.Urls.Add("http://*:80");
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
+
+
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
