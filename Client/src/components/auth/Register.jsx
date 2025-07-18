@@ -50,19 +50,18 @@ const Register = () => {
       newErrors.password = 'Password must be at least 6 characters';
     }
     
-    if (formData.confirmPassword !== formData.password) {
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.confirmPassword !== formData.password) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
     
-    // Validate new fields
+    // Validate course
     if (!formData.course.trim()) {
       newErrors.course = 'Course is required';
     }
     
-    if (!formData.yearOfStudy) {
-      newErrors.yearOfStudy = 'Year of study is required';
-    }
-    
+    // Accommodation type validation
     if (!formData.accommodationType) {
       newErrors.accommodationType = 'Accommodation type is required';
     }
@@ -79,10 +78,21 @@ const Register = () => {
       setServerError('');
       
       try {
+        console.log('Submitting registration form with data:', {
+          username: formData.username,
+          email: formData.email,
+          password: '********', // Don't log actual password
+          confirmPassword: '********', // Don't log actual confirmPassword
+          course: formData.course,
+          yearOfStudy: formData.yearOfStudy,
+          accommodationType: formData.accommodationType
+        });
+        
         const result = await register(
           formData.username,
           formData.email,
           formData.password,
+          formData.confirmPassword, // Added confirmPassword parameter
           formData.course,
           formData.yearOfStudy,
           formData.accommodationType
@@ -95,6 +105,7 @@ const Register = () => {
           setServerError(result.error || 'Registration failed');
         }
       } catch (error) {
+        console.error('Registration error in component:', error);
         setServerError(error.message || 'An error occurred during registration');
       } finally {
         setIsSubmitting(false);
@@ -165,7 +176,7 @@ const Register = () => {
             {errors.confirmPassword && <span className="error-message">{errors.confirmPassword}</span>}
           </div>
           
-          {/* New student-specific fields */}
+          {/* Student-specific fields */}
           <div className="form-group">
             <label htmlFor="course">Course</label>
             <input

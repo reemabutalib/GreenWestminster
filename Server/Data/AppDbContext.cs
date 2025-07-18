@@ -2,6 +2,8 @@ using Server.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql.EntityFrameworkCore.PostgreSQL; // Important PostgreSQL namespace
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using System;
 
 namespace Server.Data;
 
@@ -16,6 +18,17 @@ public class AppDbContext : DbContext
     public DbSet<ActivityCompletion> ActivityCompletions { get; set; } = null!;
     public DbSet<Challenge> Challenges { get; set; } = null!;
     public DbSet<UserChallenge> UserChallenges { get; set; } = null!;
+    
+    // Add the ConfigureConventions method to handle DateTime UTC conversion
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        
+        // Configure all DateTime properties to use UTC time
+        configurationBuilder
+            .Properties<DateTime>()
+            .HaveConversion<UtcValueConverter>();
+    }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,7 +84,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.UserId).HasColumnName("userid");
             entity.Property(e => e.ActivityId).HasColumnName("activityid");
-            entity.Property(e => e.CompletedAt).HasColumnName("completedat");
+            entity.Property(e => e.CompletedAt).HasColumnName("completedat"); // Updated property and column name
             entity.Property(e => e.PointsEarned).HasColumnName("pointsearned");
         });
         
@@ -126,5 +139,16 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Challenge>()
             .Navigation(c => c.Activities)
             .UsePropertyAccessMode(PropertyAccessMode.Property);
+    }
+}
+
+// Define the UtcValueConverter class within the same namespace
+public class UtcValueConverter : ValueConverter<DateTime, DateTime>
+{
+    public UtcValueConverter() 
+        : base(
+            v => v.Kind == DateTimeKind.Utc ? v : DateTime.SpecifyKind(v, DateTimeKind.Utc),
+            v => DateTime.SpecifyKind(v, DateTimeKind.Utc))
+    {
     }
 }

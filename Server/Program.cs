@@ -6,23 +6,33 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Add services to the container
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddControllers();
+
+// Configure logging
+builder.Services.AddLogging(logging =>
+{
+    logging.AddConsole();
+    logging.AddDebug();
+    // Enable detailed CORS logs for debugging
+    logging.AddFilter("Microsoft.AspNetCore.Cors", LogLevel.Debug);
+});
 
 // Add database context
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add CORS - Define once
+// Add CORS configuration
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
@@ -43,93 +53,39 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 var app = builder.Build();
 
-// Database initialization should happen BEFORE using the app
-// This ensures the database is ready before any requests come in
+// Initialize and seed the database before handling any requests
+await InitializeDatabase(app);
 
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    try
-    {
-        var context = services.GetRequiredService<AppDbContext>();
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        
-        logger.LogInformation("Initializing database...");
-        
-        try
-        {
-            // CRITICAL FIX: Force recreate the schema with proper table names
-            // Comment out after successful creation to avoid data loss on restarts
-            await context.Database.EnsureCreatedAsync();
-            
-            // Explicitly check if tables are populated
-            bool hasData = false;
-            
-            try
-            {
-                // Try direct SQL query with lowercase table name
-                var result = await context.Database.ExecuteSqlRawAsync("SELECT COUNT(*) FROM users");
-                hasData = result > 0;
-            }
-            catch (Exception)
-            {
-                logger.LogInformation("Tables not found or empty, seeding data...");
-                hasData = false;
-            }
-            
-            if (!hasData)
-            {
-                logger.LogInformation("Seeding database with initial data...");
-                await DbSeeder.SeedData(context);
-                logger.LogInformation("Database seeded successfully.");
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error during schema creation or data seeding");
-            throw; // Rethrow to be caught by outer try-catch
-        }
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while initializing the database.");
-        Console.WriteLine($"Database initialization error: {ex.Message}");
-        
-        if (ex.InnerException != null)
-        {
-            Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
-            logger.LogError(ex.InnerException, "Inner exception details");
-        }
-    }
-}
-
-// Configure the HTTP request pipeline.
+// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
+
+// Middleware pipeline (order matters!)
+app.UseCors("AllowReactApp");  // CORS should be before auth middleware
+
+// Only use HTTPS redirection in production to avoid development issues
+if (!app.Environment.IsDevelopment())
+{
     app.UseHttpsRedirection();
 }
 
-// Use CORS middleware - Use the named policy
-app.UseCors("AllowReactApp");
-
-// Authentication before Authorization
-app.UseAuthentication();
+app.UseAuthentication();  // Authentication always before Authorization
 app.UseAuthorization();
 
-// Map controllers after middleware
 app.MapControllers();
 
-// Sample endpoint
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
+// Weather forecast sample endpoint
 app.MapGet("/weatherforecast", () =>
 {
+    var summaries = new[]
+    {
+        "Freezing", "Bracing", "Chilly", "Cool", "Mild", 
+        "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+    };
+    
     var forecast = Enumerable.Range(1, 5).Select(index =>
         new WeatherForecast
         (
@@ -143,11 +99,67 @@ app.MapGet("/weatherforecast", () =>
 .WithName("GetWeatherForecast")
 .WithOpenApi();
 
-// Set URL at the end before running
+// Set URL binding
 app.Urls.Add("http://*:80");
 
 await app.RunAsync();
 
+// Database initialization method to keep the main flow clean
+async Task InitializeDatabase(WebApplication application)
+{
+    using var scope = application.Services.CreateScope();
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    
+    try
+    {
+        logger.LogInformation("Initializing database...");
+        var context = services.GetRequiredService<AppDbContext>();
+        
+        // Create the schema if needed
+        await context.Database.EnsureCreatedAsync();
+        
+        // Check if data exists
+        bool hasData = false;
+        try
+        {
+            // Use parameterized query for better security
+            var result = await context.Database.ExecuteSqlRawAsync("SELECT COUNT(*) FROM users");
+            hasData = result > 0;
+        }
+        catch (Exception ex)
+        {
+            logger.LogInformation(ex, "Tables not found or empty, will proceed with data seeding");
+        }
+        
+        // Seed data if needed
+        if (!hasData)
+        {
+            logger.LogInformation("Seeding database with initial data...");
+            await DbSeeder.SeedData(context);
+            logger.LogInformation("Database seeded successfully");
+        }
+        else
+        {
+            logger.LogInformation("Database already contains data, skipping seed");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred while initializing the database");
+        
+        if (ex.InnerException != null)
+        {
+            logger.LogError(ex.InnerException, "Inner exception details");
+        }
+        
+        // Optionally terminate the application on critical DB errors
+        // application.Logger.LogCritical("Application cannot continue without database");
+        // Environment.Exit(1);
+    }
+}
+
+// Weather forecast record definition
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);

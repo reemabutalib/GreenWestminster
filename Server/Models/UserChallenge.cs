@@ -23,7 +23,7 @@ public class UserChallenge
     public DateTime JoinedDate { get; set; } = DateTime.UtcNow;
     
     // Add property to track challenge status as a string
-    public string Status { get; set; } = "Completed";
+    public string Status { get; set; } = "In Progress";
 
     public virtual User User { get; set; } = null!;
     public virtual Challenge Challenge { get; set; } = null!;

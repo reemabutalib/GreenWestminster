@@ -9,15 +9,20 @@ const ActivitiesPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const userId = 1; // For demo purposes, hardcoded user ID
+  // Get API base URL from environment variable
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80';
+  
+  // Get user ID from localStorage instead of hardcoding
+  const userId = localStorage.getItem('userId') || 1;
 
   useEffect(() => {
     const fetchActivities = async () => {
       try {
-        const response = await fetch('/api/activities');
+        // Use the correct API URL with the base URL
+        const response = await fetch(`${API_BASE_URL}/api/activities`);
         
         if (!response.ok) {
-          throw new Error('Failed to fetch activities');
+          throw new Error(`Failed to fetch activities: ${response.status}`);
         }
         
         const activitiesData = await response.json();
@@ -28,13 +33,14 @@ const ActivitiesPage = () => {
         setCategories(uniqueCategories);
         setLoading(false);
       } catch (err) {
+        console.error('Error fetching activities:', err);
         setError(err.message);
         setLoading(false);
       }
     };
     
     fetchActivities();
-  }, []);
+  }, [API_BASE_URL]);
 
   const filteredActivities = activeCategory === 'all'
     ? activities

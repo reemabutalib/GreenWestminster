@@ -119,24 +119,24 @@ public class UsersController : ControllerBase
             return NotFound();
         }
         
-        var recentActivities = await _context.ActivityCompletions
-            .Include(ac => ac.Activity)
-            .Where(ac => ac.UserId == id)
-            .OrderByDescending(ac => ac.CompletedAt)
-            .Take(10)
-            .Select(ac => new
+      var recentActivities = await _context.ActivityCompletions
+        .Include(ac => ac.Activity)
+        .Where(ac => ac.UserId == id)
+        .OrderByDescending(ac => ac.CompletedAt) // Changed to CompletedAt
+        .Take(10)
+        .Select(ac => new
+        {
+            id = ac.Id,
+            completedAt = ac.CompletedAt, // Changed to CompletedAt
+            pointsEarned = ac.PointsEarned,
+            activity = new 
             {
-                id = ac.Id,
-                completedAt = ac.CompletedAt,
-                pointsEarned = ac.PointsEarned,
-                activity = new 
-                {
-                    id = ac.Activity.Id,
-                    title = ac.Activity.Title,
-                    description = ac.Activity.Description
-                }
-            })
-            .ToListAsync();
+                id = ac.Activity.Id,
+                title = ac.Activity.Title,
+                description = ac.Activity.Description
+            }
+        })
+        .ToListAsync();
             
         return recentActivities;
     }
@@ -154,11 +154,11 @@ public class UsersController : ControllerBase
         
         var completedActivities = await _context.ActivityCompletions
             .Include(ac => ac.Activity)
-            .Where(ac => ac.UserId == id && ac.CompletedAt.Date == date.Date)
+            .Where(ac => ac.UserId == id && ac.CompletedAt.Date == date.Date) // Changed to CompletedAt
             .Select(ac => new
             {
                 id = ac.Id,
-                completedAt = ac.CompletedAt,
+                completedAt = ac.CompletedAt, // Changed to CompletedAt
                 pointsEarned = ac.PointsEarned,
                 activity = new 
                 {
@@ -196,7 +196,7 @@ public class UsersController : ControllerBase
                 pointsReward = uc.Challenge.PointsReward,
                 startDate = uc.Challenge.StartDate,
                 endDate = uc.Challenge.EndDate,
-                completedDate = uc.CompletedDate
+                completedAt = uc.CompletedAt // Changed from completedDate to match model
             })
             .ToListAsync();
             
@@ -250,18 +250,18 @@ public class UsersController : ControllerBase
         {
             var todayCompletion = await _context.ActivityCompletions
                 .Where(ac => ac.UserId == userId && ac.ActivityId == activityId && 
-                       ac.CompletedAt.Date == DateTime.UtcNow.Date)
+                        ac.CompletedAt.Date == DateTime.UtcNow.Date) // Changed to CompletedAt
                 .FirstOrDefaultAsync();
                 
             if (todayCompletion != null)
                 return BadRequest("Activity already completed today");
         }
-        
+
         var completion = new ActivityCompletion
         {
             UserId = userId,
             ActivityId = activityId,
-            CompletedAt = DateTime.UtcNow,
+            CompletedAt = DateTime.UtcNow, // Changed to CompletedAt
             PointsEarned = activity.PointsValue
         };
         

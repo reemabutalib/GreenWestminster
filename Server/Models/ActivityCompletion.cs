@@ -4,9 +4,10 @@ public class ActivityCompletion
     public int Id { get; set; }
     public int UserId { get; set; }
     public int ActivityId { get; set; }
-    public DateTime CompletedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CompletedAt { get; set; } // Changed from CompletionDate to CompletedAt
     public int PointsEarned { get; set; }
-
-    public virtual User User { get; set; } = null!;
-    public virtual SustainableActivity Activity { get; set; } = null!;
+    
+    // Navigation properties
+    public User User { get; set; }
+    public SustainableActivity Activity { get; set; }
 }

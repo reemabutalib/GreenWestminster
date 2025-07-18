@@ -14,6 +14,9 @@ const ChallengesPage = () => {
   // Add this for debugging
   console.log('ChallengesPage rendering, challenges:', challenges, 'loading:', loading, 'error:', error);
 
+  // Define API base URL - update this to match your backend port
+  const API_BASE_URL = 'http://localhost:80'; // Changed from 5138 to 80
+
   useEffect(() => {
     console.log('ChallengesPage component mounted');
     
@@ -23,14 +26,16 @@ const ChallengesPage = () => {
       
       try {
         // Fetch appropriate challenges based on active tab
-        const endpoint = activeTab === 'active' 
-          ? '/api/challenges/active'
-          : '/api/challenges';
+        let endpoint = '/api/challenges';
+        
+        if (activeTab === 'active') {
+          endpoint = '/api/challenges/active';
+        } else if (activeTab === 'past') {
+          endpoint = '/api/challenges/past';
+        }
         
         console.log(`Fetching from endpoint: ${endpoint}`);
         
-        // Add API_BASE_URL to ensure correct endpoint
-        const API_BASE_URL = 'http://localhost:5138'; // Update with your server port
         const fullUrl = `${API_BASE_URL}${endpoint}`;
         console.log(`Full request URL: ${fullUrl}`);
         
@@ -62,10 +67,16 @@ const ChallengesPage = () => {
           data = data.filter(challenge => new Date(challenge.startDate) > now);
         }
         
+        // If we're on the past tab but we don't have a dedicated endpoint, filter client-side
+        if (activeTab === 'past' && endpoint !== '/api/challenges/past') {
+          const now = new Date();
+          data = data.filter(challenge => new Date(challenge.endDate) < now);
+        }
+        
         // If we're on the completed tab, fetch user's completed challenges
         if (activeTab === 'completed') {
           try {
-            const completedResponse = await fetch(`/api/users/${userId}/challenges/completed`);
+            const completedResponse = await fetch(`${API_BASE_URL}/api/users/${userId}/challenges/completed`);
             
             if (!completedResponse.ok) {
               console.warn('Failed to fetch completed challenges, using empty array');
@@ -94,7 +105,7 @@ const ChallengesPage = () => {
   
   const handleJoinChallenge = async (challengeId) => {
     try {
-      const response = await fetch(`/api/challenges/${challengeId}/join/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/challenges/${challengeId}/join/${userId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -151,6 +162,12 @@ const ChallengesPage = () => {
           onClick={() => setActiveTab('upcoming')}
         >
           Upcoming
+        </button>
+        <button 
+          className={`tab ${activeTab === 'past' ? 'active' : ''}`}
+          onClick={() => setActiveTab('past')}
+        >
+          Past
         </button>
         <button 
           className={`tab ${activeTab === 'completed' ? 'active' : ''}`}
