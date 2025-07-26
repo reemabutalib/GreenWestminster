@@ -10,6 +10,7 @@ public class User
     public int Points { get; set; } = 0;
     public int CurrentStreak { get; set; } = 0;
     public int MaxStreak { get; set; } = 0;
+    public int Level { get; set; } = 1;
     public DateTime LastActivityDate { get; set; } = DateTime.UtcNow;
 
     // New student-specific fields

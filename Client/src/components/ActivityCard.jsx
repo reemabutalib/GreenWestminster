@@ -1,4 +1,3 @@
-import React, { useEffect } from 'react';
 import '../styling/ActivityCard.css';
 
 const ActivityCard = ({ activity, onCompleteClick }) => {
@@ -24,13 +23,6 @@ const ActivityCard = ({ activity, onCompleteClick }) => {
   const isWeeklyExplicit = isTrueProperty(activity, ['isWeekly', 'IsWeekly', 'isweekly', 'weekly']);
   // For weekly: either explicit isWeekly=true OR isDaily=false
   const isWeekly = isWeeklyExplicit || (!isDaily && activity.isDaily === false);
-  
-  // Debug logging - check all possible property formats
-  useEffect(() => {
-    if (isWeekly) {
-      console.log('Weekly activity detected:', activity.title);
-    }
-  }, [activity, isWeekly]);
 
   const handleCompleteActivity = () => {
     onCompleteClick(activity);

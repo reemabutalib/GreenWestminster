@@ -81,3 +81,206 @@
     padding: 2rem;
   }
 }
+
+/* Carbon Impact Section */
+.carbon-impact-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: #f0f8f0;
+  border-radius: 8px;
+}
+
+.carbon-impact-container {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.impact-card {
+  flex: 1;
+  min-width: 120px;
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  transition: transform 0.2s ease-in-out;
+}
+
+.impact-card:hover {
+  transform: translateY(-5px);
+}
+
+.impact-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.impact-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #2e7d32;
+}
+
+.impact-label {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .carbon-impact-container {
+    flex-direction: column;
+  }
+  
+  .impact-card {
+    width: 100%;
+  }
+}
+
+/* Chart styles */
+.progress-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: #f0f8f0;
+  border-radius: 8px;
+}
+
+.charts-container {
+  margin-top: 1rem;
+}
+
+.chart-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.chart-card {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  flex: 1;
+}
+
+.chart-card h4 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #2e7d32;
+  text-align: center;
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .chart-row {
+    flex-direction: column;
+  }
+}
+
+/* Level Section Styles */
+.level-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: #f0f8f0;
+  border-radius: 8px;
+}
+
+.level-card {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 1rem;
+}
+
+.level-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-right: 2rem;
+}
+
+.badge-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.badge-text {
+  background: #2e7d32;
+  color: white;
+  font-weight: bold;
+  font-size: 1.2rem;
+  padding: 0.5rem 1rem;
+  border-radius: 50px;
+  text-align: center;
+}
+
+.level-progress {
+  flex: 1;
+}
+
+.progress-text {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.level-title {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #2e7d32;
+}
+
+.points-to-next {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.max-level {
+  font-size: 0.9rem;
+  color: #ff9800;
+  font-weight: bold;
+}
+
+.progress-bar {
+  height: 12px;
+  background: #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #4caf50;
+  border-radius: 6px;
+  transition: width 0.5s ease-in-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .level-card {
+    flex-direction: column;
+  }
+  
+  .level-badge {
+    margin-right: 0;
+    margin-bottom: 1.5rem;
+  }
+  
+  .progress-text {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.5rem;
+  }
+}

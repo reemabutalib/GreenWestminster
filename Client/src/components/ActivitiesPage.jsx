@@ -74,29 +74,6 @@ const ActivitiesPage = () => {
     fetchActivities();
   }, [API_BASE_URL]);
 
- // Debug function to see exactly what's in the activities data
- useEffect(() => {
-  if (activities.length > 0 && activeFrequency === 'weekly') {
-    console.log('All activities count:', activities.length);
-    console.log('Raw activities data:', JSON.stringify(activities, null, 2));
-    
-    // Check each activity for weekly properties with different formats
-    activities.forEach(activity => {
-      console.log(`Activity: ${activity.title}`);
-      console.log(`  isWeekly (direct): ${activity.isWeekly}`);
-      console.log(`  IsWeekly (capital): ${activity.IsWeekly}`);
-      console.log(`  Type of isWeekly: ${typeof activity.isWeekly}`);
-      // Add more comprehensive debug for all properties
-      console.log(`  All properties:`, Object.keys(activity));
-    });
-
-    const weeklyActivities = activities.filter(a => 
-      getPropertyValue(a, ['isWeekly', 'isweekly', 'IsWeekly', 'ISWEEKLY'])
-    );
-    console.log('Weekly activities found:', weeklyActivities.length);
-  }
-}, [activities, activeFrequency]);
-
  // Update your filter function to remove one-time handling
 const filteredActivities = activities.filter(activity => {
   // Apply category filter
