@@ -95,40 +95,78 @@ public class ActivitiesController : ControllerBase
     }
 
     // POST: api/activities
-    [HttpPost]
-    [Authorize] 
-    public async Task<ActionResult<object>> CreateActivity(SustainableActivity activity)
+[HttpPost]
+[Authorize]
+public async Task<ActionResult<object>> CreateActivity(CreateActivityDto activityDto)
+{
+    try
     {
-        try
+        _logger.LogInformation("Creating new activity: {Title}", activityDto.Title);
+        
+        if (activityDto == null)
         {
-            _logger.LogInformation("Creating new activity: {Title}", activity.Title);
-            
-            if (activity == null)
+            return BadRequest(new { message = "Activity data is required" });
+        }
+        
+        // Create activity with only the fields we know exist in the database
+        var sql = @"
+            INSERT INTO sustainableactivities 
+                (title, description, category, pointsvalue, isdaily, isweekly, isonetime)
+            VALUES 
+                (@title, @description, @category, @pointsValue, @isDaily, @isWeekly, @isOneTime)
+            RETURNING id";
+        
+        var parameters = new[]
+        {
+            new NpgsqlParameter("title", activityDto.Title),
+            new NpgsqlParameter("description", activityDto.Description),
+            new NpgsqlParameter("category", activityDto.Category),
+            new NpgsqlParameter("pointsValue", activityDto.PointsValue),
+            new NpgsqlParameter("isDaily", activityDto.IsDaily),
+            new NpgsqlParameter("isWeekly", activityDto.IsWeekly),
+            new NpgsqlParameter("isOneTime", activityDto.IsOneTime)
+        };
+        
+        // Execute the SQL directly to bypass EF Core's mapping
+        int newActivityId;
+        using (var command = _context.Database.GetDbConnection().CreateCommand())
+        {
+            command.CommandText = sql;
+            foreach (var param in parameters)
             {
-                return BadRequest(new { message = "Activity data is required" });
+                command.Parameters.Add(param);
             }
-            
-            _context.SustainableActivities.Add(activity);
-            await _context.SaveChangesAsync();
 
-            var createdActivity = new
+            if (command.Connection.State != System.Data.ConnectionState.Open)
             {
-                id = activity.Id,
-                title = activity.Title,
-                description = activity.Description,
-                category = activity.Category,
-                pointsValue = activity.PointsValue,
-                isDaily = activity.IsDaily
-            };
+                command.Connection.Open();
+            }
 
-            return CreatedAtAction(nameof(GetActivity), new { id = activity.Id }, createdActivity);
+            // Get the ID of the newly inserted activity
+            newActivityId = Convert.ToInt32(await command.ExecuteScalarAsync());
         }
-        catch (Exception ex)
+        
+        // Return the created activity
+        var createdActivity = new
         {
-            _logger.LogError(ex, "Error occurred while creating activity");
-            return StatusCode(500, new { message = "An error occurred while creating the activity", error = ex.Message });
-        }
+            id = newActivityId,
+            title = activityDto.Title,
+            description = activityDto.Description,
+            category = activityDto.Category,
+            pointsValue = activityDto.PointsValue,
+            isDaily = activityDto.IsDaily,
+            isWeekly = activityDto.IsWeekly,
+            isOneTime = activityDto.IsOneTime
+        };
+
+        return CreatedAtAction(nameof(GetActivity), new { id = newActivityId }, createdActivity);
     }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error occurred while creating activity: {Error}", ex.Message);
+        return StatusCode(500, new { message = "An error occurred while creating the activity", error = ex.Message });
+    }
+}
 
     // PUT: api/activities/5
     [HttpPut("{id}")]
@@ -301,7 +339,9 @@ public class ActivitiesController : ControllerBase
 // POST: api/activities/{id}/complete
 [HttpPost("{id}/complete")]
 [Authorize]
-public async Task<IActionResult> CompleteActivity(int id, [FromBody] ActivityCompletionDto completionData)
+[RequestSizeLimit(10 * 1024 * 1024)] // Limit to 10MB
+[RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
+public async Task<IActionResult> CompleteActivity(int id, [FromForm] ActivityCompletionDto completionData)
 {
     try
     {
@@ -364,25 +404,94 @@ public async Task<IActionResult> CompleteActivity(int id, [FromBody] ActivityCom
             return BadRequest(new { message = "Activity already completed today" });
         }
 
-        // Insert completion with direct SQL
+        // Handle image upload if provided
+        string imageFileName = null;
+        if (completionData.Image != null && completionData.Image.Length > 0)
+        {
+            // Generate a unique filename with timestamp
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
+            var fileExtension = Path.GetExtension(completionData.Image.FileName);
+            imageFileName = $"activity_{id}_user_{completionData.UserId}_{timestamp}{fileExtension}";
+            
+            // Create uploads directory if it doesn't exist
+            var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+            if (!Directory.Exists(uploadsDir))
+            {
+                Directory.CreateDirectory(uploadsDir);
+            }
+            
+            // Save the file
+            var filePath = Path.Combine(uploadsDir, imageFileName);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await completionData.Image.CopyToAsync(stream);
+            }
+            
+            _logger.LogInformation("Saved image {ImageFileName} for activity completion", imageFileName);
+        }
+
+        // Insert completion with direct SQL, now including image path and review status
         var completedAt = completionData.CompletedAt != null 
             ? DateTime.SpecifyKind(completionData.CompletedAt.Value, DateTimeKind.Utc) 
             : DateTime.UtcNow;
+        
+        // First, alter the table if these columns don't exist
+        try
+        {
+            // Check if the columns exist before trying to add them
+            var checkColumnsQuery = @"
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'activitycompletions' 
+                  AND column_name IN ('imagepath', 'notes', 'reviewstatus')";
             
+            var existingColumns = await _context.Database
+                .SqlQueryRaw<string>(checkColumnsQuery)
+                .ToListAsync();
+                
+            if (!existingColumns.Contains("imagepath"))
+            {
+                await _context.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE activitycompletions ADD COLUMN imagepath text");
+            }
+            
+            if (!existingColumns.Contains("notes"))
+            {
+                await _context.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE activitycompletions ADD COLUMN notes text");
+            }
+            
+            if (!existingColumns.Contains("reviewstatus"))
+            {
+                await _context.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE activitycompletions ADD COLUMN reviewstatus varchar(20) DEFAULT 'Pending Review'");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error checking/adding columns to activitycompletions table. " +
+                "This is expected if columns already exist");
+            // Continue anyway - if columns exist, this is fine
+        }
+
+        // Insert completion record with all fields
         var insertSql = @"
-            INSERT INTO activitycompletions (userid, activityid, completedat) 
-            VALUES (@userId, @activityId, @completedAt)";
+            INSERT INTO activitycompletions (userid, activityid, completedat, imagepath, notes, reviewstatus) 
+            VALUES (@userId, @activityId, @completedAt, @imagePath, @notes, @reviewStatus)";
             
         var insertParams = new[]
         {
             new NpgsqlParameter("userId", completionData.UserId),
             new NpgsqlParameter("activityId", id),
-            new NpgsqlParameter("completedAt", completedAt)
+            new NpgsqlParameter("completedAt", completedAt),
+            new NpgsqlParameter("imagePath", imageFileName ?? (object)DBNull.Value),
+            new NpgsqlParameter("notes", completionData.Notes ?? (object)DBNull.Value),
+            new NpgsqlParameter("reviewStatus", "Pending Review")
         };
         
         await _context.Database.ExecuteSqlRawAsync(insertSql, insertParams);
 
-        // Check for yesterday's activity with direct SQL
+        // Rest of the method remains unchanged - check for streak, update user stats
         var yesterday = today.AddDays(-1);
         var checkYesterdayQuery = @"
             SELECT COUNT(*) FROM activitycompletions 
@@ -428,11 +537,21 @@ public async Task<IActionResult> CompleteActivity(int id, [FromBody] ActivityCom
         
         await _context.Database.ExecuteSqlRawAsync(updateUserSql, updateParams);
 
+        // Return the URL for the uploaded image if available
+        string imageUrl = null;
+        if (!string.IsNullOrEmpty(imageFileName))
+        {
+            // Construct a URL to access the image
+            imageUrl = $"{Request.Scheme}://{Request.Host}/uploads/{imageFileName}";
+        }
+
         return Ok(new { 
             message = "Activity completed successfully", 
             pointsEarned = activity.PointsValue,
             currentStreak = newStreak,
-            totalPoints = newPoints
+            totalPoints = newPoints,
+            imageUrl = imageUrl,
+            reviewStatus = "Pending Review"
         });
     }
     catch (Exception ex)
@@ -449,7 +568,7 @@ public async Task<IActionResult> CompleteActivity(int id, [FromBody] ActivityCom
     }
 }
 
- // GET: api/activities/completed/{userId}?date=2025-07-10
+// GET: api/activities/completed/{userId}
 [HttpGet("completed/{userId}")]
 public async Task<ActionResult<IEnumerable<object>>> GetCompletedActivities(int userId, [FromQuery] DateTime? date = null)
 {
@@ -457,27 +576,20 @@ public async Task<ActionResult<IEnumerable<object>>> GetCompletedActivities(int 
     {
         _logger.LogInformation("Fetching completed activities for user {UserId}", userId);
 
-        // Use a simpler query that avoids directly referencing the problematic column
-        var query = from ac in _context.ActivityCompletions
-                   join act in _context.SustainableActivities on ac.ActivityId equals act.Id
-                   where ac.UserId == userId
-                   select new {
-                       id = ac.Id,
-                       userId = ac.UserId,
-                       activityId = ac.ActivityId,
-                       completedAt = ac.CompletedAt,
-                       // Instead of directly referencing ac.PointsEarned, use act.PointsValue
-                       // which we know exists in the database
-                       pointsEarned = act.PointsValue,
-                       activity = new {
-                           id = act.Id,
-                           title = act.Title,
-                           description = act.Description,
-                           pointsValue = act.PointsValue
-                       }
-                   };
+        // Use raw SQL to avoid EF Core mapping issues with dynamically added columns
+        var sql = @"
+            SELECT ac.id, ac.userid, ac.activityid, ac.completedat, 
+                   ac.imagepath, ac.notes, ac.reviewstatus,
+                   sa.pointsvalue as pointsearned,
+                   sa.id as activity_id, sa.title as activity_title, 
+                   sa.description as activity_description, sa.pointsvalue as activity_pointsvalue
+            FROM activitycompletions ac
+            JOIN sustainableactivities sa ON ac.activityid = sa.id
+            WHERE ac.userid = @userId";
 
-        // Apply date filter if provided
+        var parameters = new List<NpgsqlParameter> { new NpgsqlParameter("userId", userId) };
+
+        // Add date filter if provided
         if (date.HasValue)
         {
             // Convert date to UTC and ensure Kind is set properly
@@ -487,14 +599,72 @@ public async Task<ActionResult<IEnumerable<object>>> GetCompletedActivities(int 
             _logger.LogInformation("Filtering activities by date range: {StartDate} to {EndDate}", 
                 filterDate.ToString("o"), nextDate.ToString("o"));
             
-            query = query.Where(ac => ac.completedAt >= filterDate && ac.completedAt < nextDate);
+            sql += " AND ac.completedat >= @startDate AND ac.completedat < @endDate";
+            parameters.Add(new NpgsqlParameter("startDate", filterDate));
+            parameters.Add(new NpgsqlParameter("endDate", nextDate));
         }
 
-        var completions = await query
-            .OrderByDescending(ac => ac.completedAt)
-            .ToListAsync();
+        sql += " ORDER BY ac.completedat DESC";
 
-        return Ok(completions);
+        var completions = new List<dynamic>();
+        
+        using (var command = _context.Database.GetDbConnection().CreateCommand())
+        {
+            command.CommandText = sql;
+            foreach (var param in parameters)
+            {
+                command.Parameters.Add(param);
+            }
+
+            if (command.Connection.State != System.Data.ConnectionState.Open)
+            {
+                command.Connection.Open();
+            }
+
+            using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var completion = new
+                    {
+                        id = reader.GetInt32(reader.GetOrdinal("id")),
+                        userId = reader.GetInt32(reader.GetOrdinal("userid")),
+                        activityId = reader.GetInt32(reader.GetOrdinal("activityid")),
+                        completedAt = reader.GetDateTime(reader.GetOrdinal("completedat")),
+                        imagePath = reader.IsDBNull(reader.GetOrdinal("imagepath")) ? null : reader.GetString(reader.GetOrdinal("imagepath")),
+                        notes = reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes")),
+                        reviewStatus = reader.IsDBNull(reader.GetOrdinal("reviewstatus")) ? "Pending Review" : reader.GetString(reader.GetOrdinal("reviewstatus")),
+                        pointsEarned = reader.GetInt32(reader.GetOrdinal("pointsearned")),
+                        activity = new
+                        {
+                            id = reader.GetInt32(reader.GetOrdinal("activity_id")),
+                            title = reader.GetString(reader.GetOrdinal("activity_title")),
+                            description = reader.GetString(reader.GetOrdinal("activity_description")),
+                            pointsValue = reader.GetInt32(reader.GetOrdinal("activity_pointsvalue"))
+                        }
+                    };
+                    
+                    completions.Add(completion);
+                }
+            }
+        }
+
+        // Transform the results to include full image URLs
+        var result = completions.Select(c => new {
+            id = c.id,
+            userId = c.userId,
+            activityId = c.activityId,
+            completedAt = c.completedAt,
+            notes = c.notes,
+            reviewStatus = c.reviewStatus,
+            imageUrl = !string.IsNullOrEmpty(c.imagePath) 
+                ? $"{Request.Scheme}://{Request.Host}/uploads/{c.imagePath}" 
+                : null,
+            pointsEarned = c.pointsEarned,
+            activity = c.activity
+        });
+
+        return Ok(result);
     }
     catch (Exception ex)
     {
@@ -508,7 +678,25 @@ public async Task<ActionResult<IEnumerable<object>>> GetCompletedActivities(int 
     {
         public int UserId { get; set; }
         public DateTime? CompletedAt { get; set; }
+
+        // Make notes optional
+        public string? Notes { get; set; } = null;
+
+        // Make image optional
+        public IFormFile? Image { get; set; } = null;
     }
+
+public class CreateActivityDto
+{
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int PointsValue { get; set; }
+    public string Category { get; set; } = string.Empty;
+    public bool IsDaily { get; set; }
+    public bool IsWeekly { get; set; }
+    public bool IsOneTime { get; set; }
+    // Only include the properties that exist in your database
+}
 
     private bool ActivityExists(int id)
     {

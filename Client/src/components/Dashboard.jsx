@@ -3,8 +3,8 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from './context/UserContext';
 import '../styling/Dashboard.css';
 import StreakCounter from './StreakCounter';
-import DailyActivities from './DailyActivities';
 import ActiveChallenges from './ActiveChallenges';
+import ActivitiesPage from './ActivitiesPage';
 
 // API base URL from environment variables
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80';
@@ -95,7 +95,7 @@ const Dashboard = () => {
           <h3>Today's Activities</h3>
           <Link to="/activities" className="view-all">View All</Link>
         </div>
-        <DailyActivities userId={userData.id} />
+        <ActivitiesPage userId={userData.id} />
 
         <div className="section-header">
           <h3>Active Challenges</h3>

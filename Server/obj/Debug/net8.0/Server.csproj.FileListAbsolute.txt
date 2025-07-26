@@ -169,3 +169,4 @@
 /Users/reemabutalib/GreenWestminster/Server/obj/Debug/net8.0/Server.pdb
 /Users/reemabutalib/GreenWestminster/Server/obj/Debug/net8.0/Server.genruntimeconfig.cache
 /Users/reemabutalib/GreenWestminster/Server/obj/Debug/net8.0/ref/Server.dll
+/Users/reemabutalib/GreenWestminster/Server/bin/Debug/net8.0/Server.staticwebassets.runtime.json

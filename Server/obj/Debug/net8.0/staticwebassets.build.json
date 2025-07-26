@@ -1,11 +1,39 @@
 {
   "Version": 1,
-  "Hash": "z8/jf/uVtfFHkS7UZKSCL97FvnwEOhJPQdCo8dr/ZzU=",
+  "Hash": "EQQVwwTglR64i0SE14/THUYJIKtuDx7CMVUOz7pxJV4=",
   "Source": "Server",
   "BasePath": "_content/Server",
   "Mode": "Default",
   "ManifestType": "Build",
   "ReferencedProjectsConfiguration": [],
-  "DiscoveryPatterns": [],
-  "Assets": []
+  "DiscoveryPatterns": [
+    {
+      "Name": "Server/wwwroot",
+      "Source": "Server",
+      "ContentRoot": "/Users/reemabutalib/GreenWestminster/Server/wwwroot/",
+      "BasePath": "_content/Server",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": [
+    {
+      "Identity": "/Users/reemabutalib/GreenWestminster/Server/wwwroot/uploads/activity_1_user_1_20250722105308426.png",
+      "SourceId": "Server",
+      "SourceType": "Discovered",
+      "ContentRoot": "/Users/reemabutalib/GreenWestminster/Server/wwwroot/",
+      "BasePath": "_content/Server",
+      "RelativePath": "uploads/activity_1_user_1_20250722105308426.png",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot/uploads/activity_1_user_1_20250722105308426.png"
+    }
+  ]
 }

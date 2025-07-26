@@ -1,38 +1,43 @@
-import { useState } from 'react';
+import React, { useEffect } from 'react';
 import '../styling/ActivityCard.css';
 
-const ActivityCard = ({ activity, userId }) => {
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const handleCompleteActivity = async () => {
-    setIsLoading(true);
-    setError(null);
+const ActivityCard = ({ activity, onCompleteClick }) => {
+  // Helper function to check boolean properties safely with multiple variations
+  const isTrueProperty = (obj, propNames) => {
+    if (!obj) return false;
     
-    try {
-      const response = await fetch(`/api/users/${userId}/completeActivity/${activity.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+    for (const propName of propNames) {
+      // Check property directly
+      if (obj[propName] === true) return true;
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to complete activity');
-      }
+      // Check string representation "true"
+      if (typeof obj[propName] === 'string' && obj[propName].toLowerCase() === 'true') return true;
       
-      setIsCompleted(true);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
+      // Check numeric representation 1
+      if (obj[propName] === 1) return true;
     }
+    return false;
+  };
+  
+  // Determine activity frequency types using the isTrueProperty helper
+  const isDaily = isTrueProperty(activity, ['isDaily', 'IsDaily', 'isdaily']);
+  const isWeeklyExplicit = isTrueProperty(activity, ['isWeekly', 'IsWeekly', 'isweekly', 'weekly']);
+  // For weekly: either explicit isWeekly=true OR isDaily=false
+  const isWeekly = isWeeklyExplicit || (!isDaily && activity.isDaily === false);
+  
+  // Debug logging - check all possible property formats
+  useEffect(() => {
+    if (isWeekly) {
+      console.log('Weekly activity detected:', activity.title);
+    }
+  }, [activity, isWeekly]);
+
+  const handleCompleteActivity = () => {
+    onCompleteClick(activity);
   };
 
   return (
-    <div className={`activity-card ${isCompleted ? 'completed' : ''}`}>
+    <div className="activity-card">
       <div className="card-tag">{activity.category}</div>
       
       <h3>{activity.title}</h3>
@@ -44,20 +49,16 @@ const ActivityCard = ({ activity, userId }) => {
         </div>
         
         <div className="frequency">
-          {activity.isDaily && <span className="badge daily">Daily</span>}
-          {activity.isWeekly && <span className="badge weekly">Weekly</span>}
-          {activity.isOneTime && <span className="badge one-time">One-time</span>}
+          {isDaily && <span className="badge daily">Daily</span>}
+          {isWeekly && <span className="badge weekly">Weekly</span>}
         </div>
       </div>
-      
-      {error && <div className="error-message">{error}</div>}
       
       <button 
         className="complete-btn"
         onClick={handleCompleteActivity}
-        disabled={isCompleted || isLoading}
       >
-        {isLoading ? 'Loading...' : isCompleted ? 'Completed' : 'Complete Activity'}
+        Complete Activity
       </button>
     </div>
   );
