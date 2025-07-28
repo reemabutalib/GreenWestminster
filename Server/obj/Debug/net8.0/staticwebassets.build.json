@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "EQQVwwTglR64i0SE14/THUYJIKtuDx7CMVUOz7pxJV4=",
+  "Hash": "30AEQEUqCT+ME9Bhh1fu2Yk+oDPsez+3hWvOVPtX6wE=",
   "Source": "Server",
   "BasePath": "_content/Server",
   "Mode": "Default",
@@ -34,6 +34,44 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot/uploads/activity_1_user_1_20250722105308426.png"
+    },
+    {
+      "Identity": "/Users/reemabutalib/GreenWestminster/Server/wwwroot/uploads/events/event_20250728104706296.webp",
+      "SourceId": "Server",
+      "SourceType": "Discovered",
+      "ContentRoot": "/Users/reemabutalib/GreenWestminster/Server/wwwroot/",
+      "BasePath": "_content/Server",
+      "RelativePath": "uploads/events/event_20250728104706296.webp",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot/uploads/events/event_20250728104706296.webp"
+    },
+    {
+      "Identity": "/Users/reemabutalib/GreenWestminster/Server/wwwroot/uploads/events/event_20250728105647082.png",
+      "SourceId": "Server",
+      "SourceType": "Discovered",
+      "ContentRoot": "/Users/reemabutalib/GreenWestminster/Server/wwwroot/",
+      "BasePath": "_content/Server",
+      "RelativePath": "uploads/events/event_20250728105647082.png",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot/uploads/events/event_20250728105647082.png"
     }
   ]
 }

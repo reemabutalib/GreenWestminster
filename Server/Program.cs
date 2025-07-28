@@ -3,6 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
+using Server.Models;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +29,11 @@ builder.Services.AddLogging(logging =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Add Identity services
+builder.Services.AddIdentity<IdentityUser, IdentityRole>()
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddDefaultTokenProviders();
+
 // Add CORS configuration
 builder.Services.AddCors(options =>
 {
@@ -37,19 +47,56 @@ builder.Services.AddCors(options =>
 });
 
 // Configure JWT authentication
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.SaveToken = true;
+    options.RequireHttpsMetadata = false; // Set to true in production
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        options.TokenValidationParameters = new TokenValidationParameters
+        ValidateIssuer = false, // Set to true and specify issuer in production
+        ValidateAudience = false, // Set to true and specify audience in production
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"] ??
+                throw new InvalidOperationException("JWT key is not configured"))),
+        RoleClaimType = "role", // This is crucial! Match the claim type in your token
+        NameClaimType = "unique_name"
+    };
+
+    // Return 401 Unauthorized instead of redirecting to login page
+    options.Events = new JwtBearerEvents
+    {
+        OnChallenge = context =>
         {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"] ?? 
-                    throw new InvalidOperationException("JWT key is not configured"))),
-            ValidateIssuer = false,
-            ValidateAudience = false
-        };
+            context.HandleResponse();
+            context.Response.StatusCode = 401;
+            context.Response.ContentType = "application/json";
+            var result = JsonSerializer.Serialize(new { message = "You are not authorized" });
+            return context.Response.WriteAsync(result);
+        }
+    };
+});
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminPolicy", policy =>
+    {
+        // Use both the standard claim type and the custom one
+        policy.RequireAssertion(context => 
+            context.User.HasClaim(c => 
+                (c.Type == ClaimTypes.Role && c.Value == "Admin") || 
+                (c.Type == "role" && c.Value == "Admin")
+            )
+        );
     });
+});
 
 var app = builder.Build();
 

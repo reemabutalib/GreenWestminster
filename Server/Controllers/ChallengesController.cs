@@ -153,7 +153,7 @@ public class ChallengesController : ControllerBase
 
     // POST: api/challenges
     [HttpPost]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<object>> CreateChallenge(Challenge challenge)
     {
         try
@@ -342,6 +342,209 @@ await _context.Database.ExecuteSqlRawAsync(sql, parameters);
             return StatusCode(500, new { message = "An error occurred while retrieving past challenges", error = ex.Message });
         }
     }
+
+    // PUT: api/challenges/{id}
+[HttpPut("{id}")]
+[Authorize(Roles = "Admin")]
+public async Task<IActionResult> UpdateChallenge(int id, Challenge challenge)
+{
+    try
+    {
+        _logger.LogInformation("Admin attempting to update challenge with ID {Id}", id);
+
+        if (id != challenge.Id)
+        {
+            _logger.LogWarning("Challenge ID mismatch: URL ID {UrlId} doesn't match body ID {BodyId}", id, challenge.Id);
+            return BadRequest(new { message = "Challenge ID mismatch" });
+        }
+
+        var existingChallenge = await _context.Challenges.FindAsync(id);
+        if (existingChallenge == null)
+        {
+            _logger.LogWarning("Admin attempted to update non-existent challenge with ID {Id}", id);
+            return NotFound(new { message = "Challenge not found" });
+        }
+
+        // Update properties from the incoming challenge
+        existingChallenge.Title = challenge.Title;
+        existingChallenge.Description = challenge.Description;
+        existingChallenge.StartDate = challenge.StartDate;
+        existingChallenge.EndDate = challenge.EndDate;
+        existingChallenge.PointsReward = challenge.PointsReward;
+        existingChallenge.Category = challenge.Category;
+
+        // Handle activities relationship properly
+        if (challenge.Activities != null)
+        {
+            // Clear existing activities to prevent EF tracking errors
+            existingChallenge.Activities = null;
+        }
+
+        // Mark as modified and save
+        _context.Entry(existingChallenge).State = EntityState.Modified;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Challenge with ID {Id} updated successfully by admin", id);
+
+        // Return updated challenge details
+        var result = new
+        {
+            id = existingChallenge.Id,
+            title = existingChallenge.Title,
+            description = existingChallenge.Description,
+            startDate = existingChallenge.StartDate,
+            endDate = existingChallenge.EndDate,
+            pointsReward = existingChallenge.PointsReward,
+            category = existingChallenge.Category,
+            isActive = existingChallenge.StartDate <= DateTime.UtcNow && existingChallenge.EndDate >= DateTime.UtcNow
+        };
+
+        return Ok(result);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error occurred while updating challenge with ID {Id}", id);
+        return StatusCode(500, new { message = $"An error occurred while updating the challenge", error = ex.Message });
+    }
+}
+
+// DELETE: api/challenges/{id}
+[HttpDelete("{id}")]
+[Authorize(Roles = "Admin")]
+public async Task<IActionResult> DeleteChallenge(int id)
+{
+    try
+    {
+        _logger.LogInformation("Admin attempting to delete challenge with ID {Id}", id);
+
+        var challenge = await _context.Challenges.FindAsync(id);
+        if (challenge == null)
+        {
+            _logger.LogWarning("Admin attempted to delete non-existent challenge with ID {Id}", id);
+            return NotFound(new { message = "Challenge not found" });
+        }
+
+        // Check if there are any users participating in this challenge
+        var userParticipations = await _context.UserChallenges
+            .Where(uc => uc.ChallengeId == id)
+            .ToListAsync();
+
+        if (userParticipations.Any())
+        {
+            _logger.LogInformation("Removing {Count} user participations for challenge with ID {Id}", 
+                userParticipations.Count, id);
+            
+            // Remove all user participations first
+            _context.UserChallenges.RemoveRange(userParticipations);
+            await _context.SaveChangesAsync();
+        }
+
+        // Now delete the challenge
+        _context.Challenges.Remove(challenge);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Challenge with ID {Id} deleted successfully by admin", id);
+        return Ok(new { message = "Challenge deleted successfully" });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error occurred while deleting challenge with ID {Id}", id);
+        return StatusCode(500, new { message = $"An error occurred while deleting the challenge", error = ex.Message });
+    }
+}
+
+// PATCH: api/challenges/{id}/status
+[HttpPatch("{id}/status")]
+[Authorize(Roles = "Admin")]
+public async Task<IActionResult> UpdateChallengeStatus(int id, [FromBody] ChallengeStatusUpdateDto statusUpdate)
+{
+    try
+    {
+        _logger.LogInformation("Admin attempting to update status of challenge with ID {Id}", id);
+
+        var challenge = await _context.Challenges.FindAsync(id);
+        if (challenge == null)
+        {
+            _logger.LogWarning("Admin attempted to update status of non-existent challenge with ID {Id}", id);
+            return NotFound(new { message = "Challenge not found" });
+        }
+
+        // Update only the specific fields provided in the status update
+        if (statusUpdate.IsActive.HasValue)
+        {
+            // If isActive is true, set dates accordingly
+            if (statusUpdate.IsActive.Value)
+            {
+                // If not already active, set start date to now if not provided
+                if (statusUpdate.StartDate.HasValue)
+                {
+                    challenge.StartDate = statusUpdate.StartDate.Value;
+                }
+                else if (challenge.StartDate > DateTime.UtcNow)
+                {
+                    challenge.StartDate = DateTime.UtcNow;
+                }
+
+                // Ensure end date is in the future
+                if (statusUpdate.EndDate.HasValue)
+                {
+                    challenge.EndDate = statusUpdate.EndDate.Value;
+                }
+                else if (challenge.EndDate < DateTime.UtcNow)
+                {
+                    // Set default end date to 30 days from now if not provided and current end date is in the past
+                    challenge.EndDate = DateTime.UtcNow.AddDays(30);
+                }
+            }
+            // If setting to inactive, can optionally end it now
+            else if (statusUpdate.EndNow == true)
+            {
+                challenge.EndDate = DateTime.UtcNow;
+            }
+        }
+        else
+        {
+            // If no isActive flag, just update the dates directly if provided
+            if (statusUpdate.StartDate.HasValue)
+            {
+                challenge.StartDate = statusUpdate.StartDate.Value;
+            }
+
+            if (statusUpdate.EndDate.HasValue)
+            {
+                challenge.EndDate = statusUpdate.EndDate.Value;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Status of challenge with ID {Id} updated successfully by admin", id);
+
+        var result = new
+        {
+            id = challenge.Id,
+            title = challenge.Title,
+            startDate = challenge.StartDate,
+            endDate = challenge.EndDate,
+            isActive = challenge.StartDate <= DateTime.UtcNow && challenge.EndDate >= DateTime.UtcNow
+        };
+
+        return Ok(result);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error occurred while updating status of challenge with ID {Id}", id);
+        return StatusCode(500, new { message = $"An error occurred while updating the challenge status", error = ex.Message });
+    }
+}
+
+public class ChallengeStatusUpdateDto
+{
+    public bool? IsActive { get; set; }
+    public DateTime? StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public bool? EndNow { get; set; }
+}
 
     // DTO for joining challenges
     public class JoinChallengeDto

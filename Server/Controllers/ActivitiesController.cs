@@ -9,6 +9,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Npgsql;
+using System.Security.Claims;
+using System.Text.Json;
 
 namespace Server.Controllers;
 
@@ -44,7 +46,9 @@ public class ActivitiesController : ControllerBase
                     description = a.Description,
                     category = a.Category,
                     pointsValue = a.PointsValue,
-                    isDaily = a.IsDaily
+                    isDaily = a.IsDaily,
+                    isWeekly = a.IsWeekly,
+                    isOneTime = a.IsOneTime
                 })
                 .ToListAsync();
                 
@@ -75,7 +79,9 @@ public class ActivitiesController : ControllerBase
                     description = a.Description,
                     category = a.Category,
                     pointsValue = a.PointsValue,
-                    isDaily = a.IsDaily
+                    isDaily = a.IsDaily,
+                    isWeekly = a.IsWeekly,
+                    isOneTime = a.IsOneTime
                 })
                 .FirstOrDefaultAsync();
 
@@ -95,26 +101,116 @@ public class ActivitiesController : ControllerBase
     }
 
     // POST: api/activities
-[HttpPost]
-[Authorize]
+    [HttpPost]
+[Authorize(Policy = "AdminPolicy")]
 public async Task<ActionResult<object>> CreateActivity(CreateActivityDto activityDto)
 {
     try
     {
-        _logger.LogInformation("Creating new activity: {Title}", activityDto.Title);
+        _logger.LogInformation("Admin creating new activity: {Title}", activityDto.Title);
         
         if (activityDto == null)
         {
             return BadRequest(new { message = "Activity data is required" });
         }
+            
+            // Create activity with only the fields we know exist in the database
+            var sql = @"
+                INSERT INTO sustainableactivities 
+                    (title, description, category, pointsvalue, isdaily, isweekly, isonetime)
+                VALUES 
+                    (@title, @description, @category, @pointsValue, @isDaily, @isWeekly, @isOneTime)
+                RETURNING id";
+            
+            var parameters = new[]
+            {
+                new NpgsqlParameter("title", activityDto.Title),
+                new NpgsqlParameter("description", activityDto.Description),
+                new NpgsqlParameter("category", activityDto.Category),
+                new NpgsqlParameter("pointsValue", activityDto.PointsValue),
+                new NpgsqlParameter("isDaily", activityDto.IsDaily),
+                new NpgsqlParameter("isWeekly", activityDto.IsWeekly),
+                new NpgsqlParameter("isOneTime", activityDto.IsOneTime)
+            };
+            
+            // Execute the SQL directly to bypass EF Core's mapping
+            int newActivityId;
+            using (var command = _context.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = sql;
+                foreach (var param in parameters)
+                {
+                    command.Parameters.Add(param);
+                }
+
+                if (command.Connection.State != System.Data.ConnectionState.Open)
+                {
+                    command.Connection.Open();
+                }
+
+                // Get the ID of the newly inserted activity
+                newActivityId = Convert.ToInt32(await command.ExecuteScalarAsync());
+            }
+            
+            // Return the created activity
+            var createdActivity = new
+            {
+                id = newActivityId,
+                title = activityDto.Title,
+                description = activityDto.Description,
+                category = activityDto.Category,
+                pointsValue = activityDto.PointsValue,
+                isDaily = activityDto.IsDaily,
+                isWeekly = activityDto.IsWeekly,
+                isOneTime = activityDto.IsOneTime
+            };
+
+            return CreatedAtAction(nameof(GetActivity), new { id = newActivityId }, createdActivity);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while creating activity: {Error}", ex.Message);
+            return StatusCode(500, new { message = "An error occurred while creating the activity", error = ex.Message });
+        }
+    }
+
+// PUT: api/activities
+[HttpPut]
+[Authorize(Policy = "AdminPolicy")]
+public async Task<ActionResult<object>> UpdateActivity(UpdateActivityDto activityDto)
+{
+    try
+    {
+        _logger.LogInformation("Admin updating activity: {Id} - {Title}", activityDto.Id, activityDto.Title);
         
-        // Create activity with only the fields we know exist in the database
-        var sql = @"
-            INSERT INTO sustainableactivities 
-                (title, description, category, pointsvalue, isdaily, isweekly, isonetime)
-            VALUES 
-                (@title, @description, @category, @pointsValue, @isDaily, @isWeekly, @isOneTime)
-            RETURNING id";
+        if (activityDto == null || activityDto.Id <= 0)
+        {
+            return BadRequest(new { message = "Activity data is invalid" });
+        }
+        
+        // Check if activity exists, using direct SQL to avoid any mapping issues
+        var sql = "SELECT id FROM sustainableactivities WHERE id = @id";
+        var param = new NpgsqlParameter("id", activityDto.Id);
+        
+        var exists = await _context.Database.SqlQueryRaw<int>(sql, param).AnyAsync();
+        
+        if (!exists)
+        {
+            return NotFound(new { message = $"Activity with ID: {activityDto.Id} not found" });
+        }
+        
+        // Update activity with provided fields using direct SQL to avoid mapping issues
+        var updateSql = @"
+            UPDATE sustainableactivities
+            SET 
+                title = @title, 
+                description = @description, 
+                category = @category, 
+                pointsvalue = @pointsValue, 
+                isdaily = @isDaily, 
+                isweekly = @isWeekly, 
+                isonetime = @isOneTime
+            WHERE id = @id";
         
         var parameters = new[]
         {
@@ -124,123 +220,93 @@ public async Task<ActionResult<object>> CreateActivity(CreateActivityDto activit
             new NpgsqlParameter("pointsValue", activityDto.PointsValue),
             new NpgsqlParameter("isDaily", activityDto.IsDaily),
             new NpgsqlParameter("isWeekly", activityDto.IsWeekly),
-            new NpgsqlParameter("isOneTime", activityDto.IsOneTime)
+            new NpgsqlParameter("isOneTime", activityDto.IsOneTime),
+            new NpgsqlParameter("id", activityDto.Id)
         };
         
-        // Execute the SQL directly to bypass EF Core's mapping
-        int newActivityId;
-        using (var command = _context.Database.GetDbConnection().CreateCommand())
-        {
-            command.CommandText = sql;
-            foreach (var param in parameters)
-            {
-                command.Parameters.Add(param);
-            }
-
-            if (command.Connection.State != System.Data.ConnectionState.Open)
-            {
-                command.Connection.Open();
-            }
-
-            // Get the ID of the newly inserted activity
-            newActivityId = Convert.ToInt32(await command.ExecuteScalarAsync());
-        }
+        // Execute the update
+        await _context.Database.ExecuteSqlRawAsync(updateSql, parameters);
         
-        // Return the created activity
-        var createdActivity = new
+        // Return the updated activity
+        return Ok(new
         {
-            id = newActivityId,
-            title = activityDto.Title,
-            description = activityDto.Description,
-            category = activityDto.Category,
-            pointsValue = activityDto.PointsValue,
-            isDaily = activityDto.IsDaily,
-            isWeekly = activityDto.IsWeekly,
-            isOneTime = activityDto.IsOneTime
-        };
-
-        return CreatedAtAction(nameof(GetActivity), new { id = newActivityId }, createdActivity);
+            success = true,
+            activity = new
+            {
+                id = activityDto.Id,
+                title = activityDto.Title,
+                description = activityDto.Description,
+                category = activityDto.Category,
+                pointsValue = activityDto.PointsValue,
+                isDaily = activityDto.IsDaily,
+                isWeekly = activityDto.IsWeekly,
+                isOneTime = activityDto.IsOneTime
+            }
+        });
     }
     catch (Exception ex)
     {
-        _logger.LogError(ex, "Error occurred while creating activity: {Error}", ex.Message);
-        return StatusCode(500, new { message = "An error occurred while creating the activity", error = ex.Message });
+        _logger.LogError(ex, "Error occurred while updating activity: {Error}", ex.Message);
+        return StatusCode(500, new { message = "An error occurred while updating the activity", error = ex.Message });
     }
 }
 
-    // PUT: api/activities/5
-    [HttpPut("{id}")]
-    [Authorize]
-    public async Task<IActionResult> UpdateActivity(int id, SustainableActivity activity)
+// DELETE: api/activities
+[HttpDelete]
+[Authorize(Policy = "AdminPolicy")]
+public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivityDto deleteDto)
+{
+    try
     {
-        try
+        if (deleteDto == null || deleteDto.Id <= 0)
         {
-            if (id != activity.Id)
-            {
-                return BadRequest(new { message = "Activity ID mismatch" });
-            }
-
-            _logger.LogInformation("Updating activity with ID: {Id}", id);
-            
-            var existingActivity = await _context.SustainableActivities.FindAsync(id);
-            if (existingActivity == null)
-            {
-                return NotFound(new { message = $"Activity with ID: {id} not found" });
-            }
-            
-            // Update only the scalar properties
-            existingActivity.Title = activity.Title;
-            existingActivity.Description = activity.Description;
-            existingActivity.Category = activity.Category;
-            existingActivity.PointsValue = activity.PointsValue;
-            existingActivity.IsDaily = activity.IsDaily;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException ex)
-            {
-                _logger.LogError(ex, "Concurrency error while updating activity with ID: {Id}", id);
-                return StatusCode(500, new { message = $"Concurrency error while updating activity", error = ex.Message });
-            }
-
-            return NoContent();
+            return BadRequest(new { message = "Valid activity ID is required" });
         }
-        catch (Exception ex)
+
+        _logger.LogInformation("Admin deleting activity with ID: {Id} via body payload", deleteDto.Id);
+        
+        // Check if activity exists using direct SQL
+        var checkSql = "SELECT COUNT(*) FROM sustainableactivities WHERE id = @id";
+        var checkParam = new NpgsqlParameter("id", deleteDto.Id);
+        
+        var exists = await _context.Database.SqlQueryRaw<int>(checkSql, checkParam).AnyAsync();
+        
+        if (!exists)
         {
-            _logger.LogError(ex, "Error occurred while updating activity with ID: {Id}", id);
-            return StatusCode(500, new { message = $"An error occurred while updating activity with ID: {id}", error = ex.Message });
+            _logger.LogWarning("Activity with ID: {Id} not found during delete operation", deleteDto.Id);
+            return NotFound(new { message = $"Activity with ID: {deleteDto.Id} not found" });
         }
+
+        // Check if activity has been completed by any users with direct SQL
+        var completionsSql = "SELECT id FROM activitycompletions WHERE activityid = @activityId";
+        var completionsParam = new NpgsqlParameter("activityId", deleteDto.Id);
+        
+        var completions = await _context.Database.SqlQueryRaw<int>(completionsSql, completionsParam).ToListAsync();
+        
+        if (completions.Any())
+        {
+            _logger.LogInformation("Removing {Count} activity completion records for activity with ID: {Id}", 
+                completions.Count, deleteDto.Id);
+                
+            // Delete completions first to avoid foreign key constraints
+            var deleteCompletionsSql = "DELETE FROM activitycompletions WHERE activityid = @activityId";
+            await _context.Database.ExecuteSqlRawAsync(deleteCompletionsSql, completionsParam);
+        }
+
+        // Now delete the activity
+        var deleteActivitySql = "DELETE FROM sustainableactivities WHERE id = @id";
+        await _context.Database.ExecuteSqlRawAsync(deleteActivitySql, checkParam);
+        
+        _logger.LogInformation("Activity with ID: {Id} successfully deleted by admin", deleteDto.Id);
+
+        return Ok(new { message = $"Activity with ID: {deleteDto.Id} successfully deleted" });
     }
-
-    // DELETE: api/activities/5
-    [HttpDelete("{id}")]
-    [Authorize]
-    public async Task<IActionResult> DeleteActivity(int id)
+    catch (Exception ex)
     {
-        try
-        {
-            _logger.LogInformation("Deleting activity with ID: {Id}", id);
-            
-            var activity = await _context.SustainableActivities.FindAsync(id);
-            if (activity == null)
-            {
-                _logger.LogWarning("Activity with ID: {Id} not found during delete operation", id);
-                return NotFound(new { message = $"Activity with ID: {id} not found" });
-            }
-
-            _context.SustainableActivities.Remove(activity);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while deleting activity with ID: {Id}", id);
-            return StatusCode(500, new { message = $"An error occurred while deleting activity with ID: {id}", error = ex.Message });
-        }
+        _logger.LogError(ex, "Error occurred while deleting activity with ID from body: {Error}", ex.Message);
+        return StatusCode(500, new { message = "An error occurred while deleting the activity", error = ex.Message });
     }
+}
 
     // GET: api/activities/category/waste-reduction
     [HttpGet("category/{category}")]
@@ -260,7 +326,9 @@ public async Task<ActionResult<object>> CreateActivity(CreateActivityDto activit
                     description = a.Description,
                     category = a.Category,
                     pointsValue = a.PointsValue,
-                    isDaily = a.IsDaily
+                    isDaily = a.IsDaily,
+                    isWeekly = a.IsWeekly,
+                    isOneTime = a.IsOneTime
                 })
                 .ToListAsync();
 
@@ -291,7 +359,9 @@ public async Task<ActionResult<object>> CreateActivity(CreateActivityDto activit
                     description = a.Description,
                     category = a.Category,
                     pointsValue = a.PointsValue,
-                    isDaily = a.IsDaily
+                    isDaily = a.IsDaily,
+                    isWeekly = a.IsWeekly,
+                    isOneTime = a.IsOneTime
                 })
                 .ToListAsync();
 
@@ -301,6 +371,39 @@ public async Task<ActionResult<object>> CreateActivity(CreateActivityDto activit
         {
             _logger.LogError(ex, "Error occurred while fetching daily activities");
             return StatusCode(500, new { message = "An error occurred while retrieving daily activities", error = ex.Message });
+        }
+    }
+
+    // GET: api/activities/weekly
+    [HttpGet("weekly")]
+    public async Task<ActionResult<IEnumerable<object>>> GetWeeklyActivities()
+    {
+        try
+        {
+            _logger.LogInformation("Fetching weekly activities");
+            
+            var activities = await _context.SustainableActivities
+                .AsNoTracking()
+                .Where(a => a.IsWeekly)
+                .Select(a => new
+                {
+                    id = a.Id,
+                    title = a.Title,
+                    description = a.Description,
+                    category = a.Category,
+                    pointsValue = a.PointsValue,
+                    isDaily = a.IsDaily,
+                    isWeekly = a.IsWeekly,
+                    isOneTime = a.IsOneTime
+                })
+                .ToListAsync();
+
+            return Ok(activities);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while fetching weekly activities");
+            return StatusCode(500, new { message = "An error occurred while retrieving weekly activities", error = ex.Message });
         }
     }
 
@@ -323,7 +426,9 @@ public async Task<ActionResult<object>> CreateActivity(CreateActivityDto activit
                     description = a.Description,
                     category = a.Category,
                     pointsValue = a.PointsValue,
-                    isDaily = a.IsDaily
+                    isDaily = a.IsDaily,
+                    isWeekly = a.IsWeekly,
+                    isOneTime = a.IsOneTime
                 })
                 .ToListAsync();
 
@@ -336,282 +441,282 @@ public async Task<ActionResult<object>> CreateActivity(CreateActivityDto activit
         }
     }
 
-// POST: api/activities/{id}/complete
-[HttpPost("{id}/complete")]
-[Authorize]
-[RequestSizeLimit(10 * 1024 * 1024)] // Limit to 10MB
-[RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
-public async Task<IActionResult> CompleteActivity(int id, [FromForm] ActivityCompletionDto completionData)
-{
-    try
+    // POST: api/activities/{id}/complete
+    [HttpPost("{id}/complete")]
+    [Authorize]
+    [RequestSizeLimit(10 * 1024 * 1024)] // Limit to 10MB
+    [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
+    public async Task<IActionResult> CompleteActivity(int id, [FromForm] ActivityCompletionDto completionData)
     {
-        _logger.LogInformation("Marking activity {Id} as completed for user {UserId}", id, completionData.UserId);
-        
-        // Get activity data using direct SQL
-        var activityQuery = "SELECT id, pointsvalue FROM sustainableactivities WHERE id = @id";
-        var activityParam = new NpgsqlParameter("id", id);
-        
-        var activity = await _context.SustainableActivities
-            .FromSqlRaw(activityQuery, activityParam)
-            .Select(a => new { a.Id, a.PointsValue })
-            .AsNoTracking()
-            .FirstOrDefaultAsync();
-            
-        if (activity == null)
-        {
-            _logger.LogWarning("Activity {Id} not found during completion attempt", id);
-            return NotFound(new { message = $"Activity with ID {id} not found" });
-        }
-
-        // Get the user with a direct query
-        var userQuery = "SELECT id, points, currentstreak, maxstreak, level FROM users WHERE id = @userId";
-        var userParam = new NpgsqlParameter("userId", completionData.UserId);
-        
-        var user = await _context.Users
-            .FromSqlRaw(userQuery, userParam)
-            .Select(u => new { u.Id, u.Points, u.CurrentStreak, u.MaxStreak, u.Level })
-            .AsNoTracking()
-            .FirstOrDefaultAsync();
-            
-        if (user == null)
-        {
-            _logger.LogWarning("User {UserId} not found during activity completion", completionData.UserId);
-            return NotFound(new { message = $"User with ID {completionData.UserId} not found" });
-        }
-
-        // Check if already completed today
-        var today = DateTime.UtcNow.Date;
-        var checkCompletedQuery = @"
-            SELECT COUNT(*) FROM activitycompletions 
-            WHERE userid = @userId AND activityid = @activityId AND 
-                  completedat >= @startDate AND completedat < @endDate";
-                  
-        var checkParams = new[]
-        {
-            new NpgsqlParameter("userId", completionData.UserId),
-            new NpgsqlParameter("activityId", id),
-            new NpgsqlParameter("startDate", today),
-            new NpgsqlParameter("endDate", today.AddDays(1))
-        };
-        
-        var completionCount = await _context.Database
-            .ExecuteSqlRawAsync(checkCompletedQuery, checkParams);
-            
-        if (completionCount > 0)
-        {
-            _logger.LogInformation("Activity {Id} already completed by user {UserId} today", id, completionData.UserId);
-            return BadRequest(new { message = "Activity already completed today" });
-        }
-
-        // Handle image upload if provided
-        string imageFileName = null;
-        if (completionData.Image != null && completionData.Image.Length > 0)
-        {
-            // Generate a unique filename with timestamp
-            var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
-            var fileExtension = Path.GetExtension(completionData.Image.FileName);
-            imageFileName = $"activity_{id}_user_{completionData.UserId}_{timestamp}{fileExtension}";
-            
-            // Create uploads directory if it doesn't exist
-            var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
-            if (!Directory.Exists(uploadsDir))
-            {
-                Directory.CreateDirectory(uploadsDir);
-            }
-            
-            // Save the file
-            var filePath = Path.Combine(uploadsDir, imageFileName);
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await completionData.Image.CopyToAsync(stream);
-            }
-            
-            _logger.LogInformation("Saved image {ImageFileName} for activity completion", imageFileName);
-        }
-
-        // Insert completion record
-        var completedAt = completionData.CompletedAt != null 
-            ? DateTime.SpecifyKind(completionData.CompletedAt.Value, DateTimeKind.Utc) 
-            : DateTime.UtcNow;
-        
-        // Ensure the table has the necessary columns
         try
         {
-            // Check if the columns exist before trying to add them
-            var checkColumnsQuery = @"
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'activitycompletions' 
-                  AND column_name IN ('imagepath', 'notes', 'reviewstatus')";
+            _logger.LogInformation("Marking activity {Id} as completed for user {UserId}", id, completionData.UserId);
             
-            var existingColumns = await _context.Database
-                .SqlQueryRaw<string>(checkColumnsQuery)
-                .ToListAsync();
+            // Get activity data using direct SQL
+            var activityQuery = "SELECT id, pointsvalue FROM sustainableactivities WHERE id = @id";
+            var activityParam = new NpgsqlParameter("id", id);
+            
+            var activity = await _context.SustainableActivities
+                .FromSqlRaw(activityQuery, activityParam)
+                .Select(a => new { a.Id, a.PointsValue })
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
                 
-            if (!existingColumns.Contains("imagepath"))
+            if (activity == null)
             {
-                await _context.Database.ExecuteSqlRawAsync(
-                    "ALTER TABLE activitycompletions ADD COLUMN imagepath text");
+                _logger.LogWarning("Activity {Id} not found during completion attempt", id);
+                return NotFound(new { message = $"Activity with ID {id} not found" });
+            }
+
+            // Get the user with a direct query
+            var userQuery = "SELECT id, points, currentstreak, maxstreak, level FROM users WHERE id = @userId";
+            var userParam = new NpgsqlParameter("userId", completionData.UserId);
+            
+            var user = await _context.Users
+                .FromSqlRaw(userQuery, userParam)
+                .Select(u => new { u.Id, u.Points, u.CurrentStreak, u.MaxStreak, u.Level })
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
+                
+            if (user == null)
+            {
+                _logger.LogWarning("User {UserId} not found during activity completion", completionData.UserId);
+                return NotFound(new { message = $"User with ID {completionData.UserId} not found" });
+            }
+
+            // Check if already completed today
+            var today = DateTime.UtcNow.Date;
+            var checkCompletedQuery = @"
+                SELECT COUNT(*) FROM activitycompletions 
+                WHERE userid = @userId AND activityid = @activityId AND 
+                      completedat >= @startDate AND completedat < @endDate";
+                      
+            var checkParams = new[]
+            {
+                new NpgsqlParameter("userId", completionData.UserId),
+                new NpgsqlParameter("activityId", id),
+                new NpgsqlParameter("startDate", today),
+                new NpgsqlParameter("endDate", today.AddDays(1))
+            };
+            
+            var completionCount = await _context.Database
+                .ExecuteSqlRawAsync(checkCompletedQuery, checkParams);
+                
+            if (completionCount > 0)
+            {
+                _logger.LogInformation("Activity {Id} already completed by user {UserId} today", id, completionData.UserId);
+                return BadRequest(new { message = "Activity already completed today" });
+            }
+
+            // Handle image upload if provided
+            string imageFileName = null;
+            if (completionData.Image != null && completionData.Image.Length > 0)
+            {
+                // Generate a unique filename with timestamp
+                var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
+                var fileExtension = Path.GetExtension(completionData.Image.FileName);
+                imageFileName = $"activity_{id}_user_{completionData.UserId}_{timestamp}{fileExtension}";
+                
+                // Create uploads directory if it doesn't exist
+                var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+                if (!Directory.Exists(uploadsDir))
+                {
+                    Directory.CreateDirectory(uploadsDir);
+                }
+                
+                // Save the file
+                var filePath = Path.Combine(uploadsDir, imageFileName);
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await completionData.Image.CopyToAsync(stream);
+                }
+                
+                _logger.LogInformation("Saved image {ImageFileName} for activity completion", imageFileName);
+            }
+
+            // Insert completion record
+            var completedAt = completionData.CompletedAt != null 
+                ? DateTime.SpecifyKind(completionData.CompletedAt.Value, DateTimeKind.Utc) 
+                : DateTime.UtcNow;
+            
+            // Ensure the table has the necessary columns
+            try
+            {
+                // Check if the columns exist before trying to add them
+                var checkColumnsQuery = @"
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'activitycompletions' 
+                      AND column_name IN ('imagepath', 'notes', 'reviewstatus')";
+                
+                var existingColumns = await _context.Database
+                    .SqlQueryRaw<string>(checkColumnsQuery)
+                    .ToListAsync();
+                    
+                if (!existingColumns.Contains("imagepath"))
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "ALTER TABLE activitycompletions ADD COLUMN imagepath text");
+                }
+                
+                if (!existingColumns.Contains("notes"))
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "ALTER TABLE activitycompletions ADD COLUMN notes text");
+                }
+                
+                if (!existingColumns.Contains("reviewstatus"))
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "ALTER TABLE activitycompletions ADD COLUMN reviewstatus varchar(20) DEFAULT 'Pending Review'");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error checking/adding columns to activitycompletions table. " +
+                    "This is expected if columns already exist");
+                // Continue anyway - if columns exist, this is fine
+            }
+
+            // Insert completion record with all fields
+            var insertSql = @"
+                INSERT INTO activitycompletions (userid, activityid, completedat, imagepath, notes, reviewstatus, pointsearned) 
+                VALUES (@userId, @activityId, @completedAt, @imagePath, @notes, @reviewStatus, @pointsEarned)";
+                
+            var insertParams = new[]
+            {
+                new NpgsqlParameter("userId", completionData.UserId),
+                new NpgsqlParameter("activityId", id),
+                new NpgsqlParameter("completedAt", completedAt),
+                new NpgsqlParameter("imagePath", imageFileName ?? (object)DBNull.Value),
+                new NpgsqlParameter("notes", completionData.Notes ?? (object)DBNull.Value),
+                new NpgsqlParameter("reviewStatus", "Pending Review"),
+                new NpgsqlParameter("pointsEarned", activity.PointsValue)
+            };
+            
+            await _context.Database.ExecuteSqlRawAsync(insertSql, insertParams);
+
+            // Check for streak updates
+            var yesterday = today.AddDays(-1);
+            var checkYesterdayQuery = @"
+                SELECT COUNT(*) FROM activitycompletions 
+                WHERE userid = @userId AND 
+                      completedat >= @startDate AND completedat < @endDate";
+                      
+            var yesterdayParams = new[]
+            {
+                new NpgsqlParameter("userId", completionData.UserId),
+                new NpgsqlParameter("startDate", yesterday),
+                new NpgsqlParameter("endDate", today)
+            };
+            
+            var yesterdayCount = await _context.Database
+                .ExecuteSqlRawAsync(checkYesterdayQuery, yesterdayParams);
+            
+            // Calculate streak
+            int newStreak = 1;
+            if (yesterdayCount > 0)
+            {
+                newStreak = user.CurrentStreak + 1;
             }
             
-            if (!existingColumns.Contains("notes"))
+            int newMaxStreak = Math.Max(newStreak, user.MaxStreak);
+            int newPoints = user.Points + activity.PointsValue;
+            
+            // Calculate the new level based on points thresholds
+            int newLevel = user.Level;
+            bool leveledUp = false;
+            
+            // Level thresholds
+            if (newPoints >= 1000 && user.Level < 4)
             {
-                await _context.Database.ExecuteSqlRawAsync(
-                    "ALTER TABLE activitycompletions ADD COLUMN notes text");
+                newLevel = 4;
+                leveledUp = newLevel > user.Level;
+            }
+            else if (newPoints >= 500 && user.Level < 3)
+            {
+                newLevel = 3;
+                leveledUp = newLevel > user.Level;
+            }
+            else if (newPoints >= 250 && user.Level < 2)
+            {
+                newLevel = 2;
+                leveledUp = newLevel > user.Level;
+            }
+            else if (newPoints >= 100 && user.Level < 1)
+            {
+                newLevel = 1;
+                leveledUp = newLevel > user.Level;
             }
             
-            if (!existingColumns.Contains("reviewstatus"))
+            // Update user stats with direct SQL - now including level
+            var updateUserSql = @"
+                UPDATE users 
+                SET points = @points, 
+                    currentstreak = @currentStreak, 
+                    maxstreak = @maxStreak, 
+                    lastactivitydate = @lastActivityDate,
+                    level = @level
+                WHERE id = @userId";
+                
+            var updateParams = new[]
             {
-                await _context.Database.ExecuteSqlRawAsync(
-                    "ALTER TABLE activitycompletions ADD COLUMN reviewstatus varchar(20) DEFAULT 'Pending Review'");
+                new NpgsqlParameter("points", newPoints),
+                new NpgsqlParameter("currentStreak", newStreak),
+                new NpgsqlParameter("maxStreak", newMaxStreak),
+                new NpgsqlParameter("lastActivityDate", DateTime.UtcNow),
+                new NpgsqlParameter("level", newLevel),
+                new NpgsqlParameter("userId", completionData.UserId)
+            };
+            
+            await _context.Database.ExecuteSqlRawAsync(updateUserSql, updateParams);
+
+            // Return the URL for the uploaded image if available
+            string imageUrl = null;
+            if (!string.IsNullOrEmpty(imageFileName))
+            {
+                // Construct a URL to access the image
+                imageUrl = $"{Request.Scheme}://{Request.Host}/uploads/{imageFileName}";
             }
+
+            // Calculate points needed for next level
+            int pointsToNextLevel = 0;
+            if (newLevel < 4)
+            {
+                // Calculate points needed for next level
+                if (newLevel == 1)
+                    pointsToNextLevel = 250 - newPoints;
+                else if (newLevel == 2)
+                    pointsToNextLevel = 500 - newPoints;
+                else if (newLevel == 3)
+                    pointsToNextLevel = 1000 - newPoints;
+            }
+
+            return Ok(new { 
+                message = "Activity completed successfully", 
+                pointsEarned = activity.PointsValue,
+                currentStreak = newStreak,
+                totalPoints = newPoints,
+                imageUrl = imageUrl,
+                reviewStatus = "Pending Review",
+                level = newLevel,
+                leveledUp = leveledUp,
+                pointsToNextLevel = pointsToNextLevel
+            });
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error checking/adding columns to activitycompletions table. " +
-                "This is expected if columns already exist");
-            // Continue anyway - if columns exist, this is fine
+            // Log the full exception details including inner exceptions
+            var fullError = ex.ToString();
+            _logger.LogError(ex, "Error occurred while completing activity {Id}: {ErrorMessage}\nFull error: {FullError}", 
+                id, ex.Message, fullError);
+            return StatusCode(500, new { 
+                message = $"An error occurred while completing the activity", 
+                error = ex.Message,
+                details = ex.InnerException?.Message
+            });
         }
-
-        // Insert completion record with all fields
-        var insertSql = @"
-            INSERT INTO activitycompletions (userid, activityid, completedat, imagepath, notes, reviewstatus, pointsearned) 
-            VALUES (@userId, @activityId, @completedAt, @imagePath, @notes, @reviewStatus, @pointsEarned)";
-            
-        var insertParams = new[]
-        {
-            new NpgsqlParameter("userId", completionData.UserId),
-            new NpgsqlParameter("activityId", id),
-            new NpgsqlParameter("completedAt", completedAt),
-            new NpgsqlParameter("imagePath", imageFileName ?? (object)DBNull.Value),
-            new NpgsqlParameter("notes", completionData.Notes ?? (object)DBNull.Value),
-            new NpgsqlParameter("reviewStatus", "Pending Review"),
-            new NpgsqlParameter("pointsEarned", activity.PointsValue)
-        };
-        
-        await _context.Database.ExecuteSqlRawAsync(insertSql, insertParams);
-
-        // Check for streak updates
-        var yesterday = today.AddDays(-1);
-        var checkYesterdayQuery = @"
-            SELECT COUNT(*) FROM activitycompletions 
-            WHERE userid = @userId AND 
-                  completedat >= @startDate AND completedat < @endDate";
-                  
-        var yesterdayParams = new[]
-        {
-            new NpgsqlParameter("userId", completionData.UserId),
-            new NpgsqlParameter("startDate", yesterday),
-            new NpgsqlParameter("endDate", today)
-        };
-        
-        var yesterdayCount = await _context.Database
-            .ExecuteSqlRawAsync(checkYesterdayQuery, yesterdayParams);
-        
-        // Calculate streak
-        int newStreak = 1;
-        if (yesterdayCount > 0)
-        {
-            newStreak = user.CurrentStreak + 1;
-        }
-        
-        int newMaxStreak = Math.Max(newStreak, user.MaxStreak);
-        int newPoints = user.Points + activity.PointsValue;
-        
-        // Calculate the new level based on points thresholds
-        int newLevel = user.Level;
-        bool leveledUp = false;
-        
-        // Level thresholds
-        if (newPoints >= 1000 && user.Level < 4)
-        {
-            newLevel = 4;
-            leveledUp = newLevel > user.Level;
-        }
-        else if (newPoints >= 500 && user.Level < 3)
-        {
-            newLevel = 3;
-            leveledUp = newLevel > user.Level;
-        }
-        else if (newPoints >= 250 && user.Level < 2)
-        {
-            newLevel = 2;
-            leveledUp = newLevel > user.Level;
-        }
-        else if (newPoints >= 100 && user.Level < 1)
-        {
-            newLevel = 1;
-            leveledUp = newLevel > user.Level;
-        }
-        
-        // Update user stats with direct SQL - now including level
-        var updateUserSql = @"
-            UPDATE users 
-            SET points = @points, 
-                currentstreak = @currentStreak, 
-                maxstreak = @maxStreak, 
-                lastactivitydate = @lastActivityDate,
-                level = @level
-            WHERE id = @userId";
-            
-        var updateParams = new[]
-        {
-            new NpgsqlParameter("points", newPoints),
-            new NpgsqlParameter("currentStreak", newStreak),
-            new NpgsqlParameter("maxStreak", newMaxStreak),
-            new NpgsqlParameter("lastActivityDate", DateTime.UtcNow),
-            new NpgsqlParameter("level", newLevel),
-            new NpgsqlParameter("userId", completionData.UserId)
-        };
-        
-        await _context.Database.ExecuteSqlRawAsync(updateUserSql, updateParams);
-
-        // Return the URL for the uploaded image if available
-        string imageUrl = null;
-        if (!string.IsNullOrEmpty(imageFileName))
-        {
-            // Construct a URL to access the image
-            imageUrl = $"{Request.Scheme}://{Request.Host}/uploads/{imageFileName}";
-        }
-
-        // Calculate points needed for next level
-        int pointsToNextLevel = 0;
-        if (newLevel < 4)
-        {
-            // Calculate points needed for next level
-            if (newLevel == 1)
-                pointsToNextLevel = 250 - newPoints;
-            else if (newLevel == 2)
-                pointsToNextLevel = 500 - newPoints;
-            else if (newLevel == 3)
-                pointsToNextLevel = 1000 - newPoints;
-        }
-
-        return Ok(new { 
-            message = "Activity completed successfully", 
-            pointsEarned = activity.PointsValue,
-            currentStreak = newStreak,
-            totalPoints = newPoints,
-            imageUrl = imageUrl,
-            reviewStatus = "Pending Review",
-            level = newLevel,
-            leveledUp = leveledUp,
-            pointsToNextLevel = pointsToNextLevel
-        });
     }
-    catch (Exception ex)
-    {
-        // Log the full exception details including inner exceptions
-        var fullError = ex.ToString();
-        _logger.LogError(ex, "Error occurred while completing activity {Id}: {ErrorMessage}\nFull error: {FullError}", 
-            id, ex.Message, fullError);
-        return StatusCode(500, new { 
-            message = $"An error occurred while completing the activity", 
-            error = ex.Message,
-            details = ex.InnerException?.Message
-        });
-    }
-}
 
     // GET: api/activities/completed/{userId}
     [HttpGet("completed/{userId}")]
@@ -719,160 +824,305 @@ public async Task<IActionResult> CompleteActivity(int id, [FromForm] ActivityCom
         }
     }
 
-// GET: api/activities/streak/{userId}
-[HttpGet("streak/{userId}")]
-public async Task<ActionResult<object>> GetUserStreak(int userId)
-{
-    try
+    // GET: api/activities/streak/{userId}
+    [HttpGet("streak/{userId}")]
+    public async Task<ActionResult<object>> GetUserStreak(int userId)
     {
-        _logger.LogInformation("Fetching streak information for user {UserId}", userId);
-        
-        // First check if the user exists
-        var userQuery = "SELECT id, points, currentstreak, maxstreak, lastactivitydate FROM users WHERE id = @userId";
-        var userParam = new NpgsqlParameter("userId", userId);
-        
-        var user = await _context.Users
-            .FromSqlRaw(userQuery, userParam)
-            .Select(u => new { 
-                u.Id, 
-                u.Points, 
-                u.CurrentStreak, 
-                u.MaxStreak, 
-                u.LastActivityDate 
-            })
-            .AsNoTracking()
-            .FirstOrDefaultAsync();
-            
-        if (user == null)
+        try
         {
-            _logger.LogWarning("User {UserId} not found when fetching streak", userId);
-            return NotFound(new { message = $"User with ID {userId} not found" });
-        }
-
-        // Calculate if streak is still valid (has to log activity daily)
-        var today = DateTime.UtcNow.Date;
-        var yesterday = today.AddDays(-1);
-        bool streakBroken = false;
-        
-        // Check if user has completed any activity yesterday or today
-        if (user.LastActivityDate != null)  
-{
-        // Access the Date property directly if LastActivityDate is a DateTime,
-        // or use .Value.Date if it's a nullable DateTime?
-        var lastActivityDate = user.LastActivityDate.Date; 
+            _logger.LogInformation("Fetching streak information for user {UserId}", userId);
             
-            // If last activity was before yesterday, streak is broken
-            if (lastActivityDate < yesterday)
-            {
-                streakBroken = true;
+            // First check if the user exists
+            var userQuery = "SELECT id, points, currentstreak, maxstreak, lastactivitydate FROM users WHERE id = @userId";
+            var userParam = new NpgsqlParameter("userId", userId);
+            
+            var user = await _context.Users
+                .FromSqlRaw(userQuery, userParam)
+                .Select(u => new { 
+                    u.Id, 
+                    u.Points, 
+                    u.CurrentStreak, 
+                    u.MaxStreak, 
+                    u.LastActivityDate 
+                })
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
                 
-                // Update user's current streak to 0 in database
-                var updateStreakSql = @"
-                    UPDATE users 
-                    SET currentstreak = 0
-                    WHERE id = @userId";
+            if (user == null)
+            {
+                _logger.LogWarning("User {UserId} not found when fetching streak", userId);
+                return NotFound(new { message = $"User with ID {userId} not found" });
+            }
+
+            // Calculate if streak is still valid (has to log activity daily)
+            var today = DateTime.UtcNow.Date;
+            var yesterday = today.AddDays(-1);
+            bool streakBroken = false;
+            
+            // Check if user has completed any activity yesterday or today
+            if (user.LastActivityDate != null)  
+            {
+                // Access the Date property directly if LastActivityDate is a DateTime,
+                // or use .Value.Date if it's a nullable DateTime?
+                var lastActivityDate = user.LastActivityDate.Date; 
                     
-                var updateParam = new NpgsqlParameter("userId", userId);
-                
-                await _context.Database.ExecuteSqlRawAsync(updateStreakSql, updateParam);
-                
-                // Set current streak to 0 for the response
-                user = user with { CurrentStreak = 0 };
-            }
-        }
-        else
-        {
-            // If user has no last activity date recorded, they have no streak
-            streakBroken = true;
-        }
-
-        // Get activity completion history for analytics
-        var lastWeekStart = today.AddDays(-6); // Last 7 days including today
-        
-        var activityQuery = @"
-            SELECT 
-                DATE(completedat) as activity_date, 
-                COUNT(*) as completion_count
-            FROM 
-                activitycompletions
-            WHERE 
-                userid = @userId AND
-                completedat >= @startDate
-            GROUP BY 
-                DATE(completedat)
-            ORDER BY 
-                activity_date";
-                
-        var activityParams = new[]
-        {
-            new NpgsqlParameter("userId", userId),
-            new NpgsqlParameter("startDate", lastWeekStart)
-        };
-        
-        // Get activity completion records for streak analysis
-        var activityCompletions = new List<dynamic>();
-        
-        using (var command = _context.Database.GetDbConnection().CreateCommand())
-        {
-            command.CommandText = activityQuery;
-            foreach (var param in activityParams)
-            {
-                command.Parameters.Add(param);
-            }
-
-            if (command.Connection.State != System.Data.ConnectionState.Open)
-            {
-                command.Connection.Open();
-            }
-
-            using (var reader = await command.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
+                // If last activity was before yesterday, streak is broken
+                if (lastActivityDate < yesterday)
                 {
-                    var completion = new
-                    {
-                        Date = reader.GetDateTime(reader.GetOrdinal("activity_date")),
-                        Count = reader.GetInt32(reader.GetOrdinal("completion_count"))
-                    };
+                    streakBroken = true;
                     
-                    activityCompletions.Add(completion);
+                    // Update user's current streak to 0 in database
+                    var updateStreakSql = @"
+                        UPDATE users 
+                        SET currentstreak = 0
+                        WHERE id = @userId";
+                        
+                    var updateParam = new NpgsqlParameter("userId", userId);
+                    
+                    await _context.Database.ExecuteSqlRawAsync(updateStreakSql, updateParam);
+                    
+                    // Set current streak to 0 for the response
+                    user = user with { CurrentStreak = 0 };
                 }
             }
-        }
+            else
+            {
+                // If user has no last activity date recorded, they have no streak
+                streakBroken = true;
+            }
 
-        // Create streak calendar (last 7 days with activity status)
-        var calendar = new List<object>();
-        for (int i = 0; i < 7; i++)
-        {
-            var day = today.AddDays(-6 + i);
-            var activityForDay = activityCompletions.FirstOrDefault(c => c.Date.Date == day);
+            // Get activity completion history for analytics
+            var lastWeekStart = today.AddDays(-6); // Last 7 days including today
             
-            calendar.Add(new {
-                date = day.ToString("yyyy-MM-dd"),
-                dayOfWeek = day.DayOfWeek.ToString(),
-                hasActivity = activityForDay != null,
-                completionCount = activityForDay?.Count ?? 0
+            var activityQuery = @"
+                SELECT 
+                    DATE(completedat) as activity_date, 
+                    COUNT(*) as completion_count
+                FROM 
+                    activitycompletions
+                WHERE 
+                    userid = @userId AND
+                    completedat >= @startDate
+                GROUP BY 
+                    DATE(completedat)
+                ORDER BY 
+                    activity_date";
+                    
+            var activityParams = new[]
+            {
+                new NpgsqlParameter("userId", userId),
+                new NpgsqlParameter("startDate", lastWeekStart)
+            };
+            
+            // Get activity completion records for streak analysis
+            var activityCompletions = new List<dynamic>();
+            
+            using (var command = _context.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = activityQuery;
+                foreach (var param in activityParams)
+                {
+                    command.Parameters.Add(param);
+                }
+
+                if (command.Connection.State != System.Data.ConnectionState.Open)
+                {
+                    command.Connection.Open();
+                }
+
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        var completion = new
+                        {
+                            Date = reader.GetDateTime(reader.GetOrdinal("activity_date")),
+                            Count = reader.GetInt32(reader.GetOrdinal("completion_count"))
+                        };
+                        
+                        activityCompletions.Add(completion);
+                    }
+                }
+            }
+
+            // Create streak calendar (last 7 days with activity status)
+            var calendar = new List<object>();
+            for (int i = 0; i < 7; i++)
+            {
+                var day = today.AddDays(-6 + i);
+                var activityForDay = activityCompletions.FirstOrDefault(c => c.Date.Date == day);
+                
+                calendar.Add(new {
+                    date = day.ToString("yyyy-MM-dd"),
+                    dayOfWeek = day.DayOfWeek.ToString(),
+                    hasActivity = activityForDay != null,
+                    completionCount = activityForDay?.Count ?? 0
+                });
+            }
+
+            // Return streak information
+            return Ok(new { 
+                currentStreak = user.CurrentStreak,
+                maxStreak = user.MaxStreak,
+                streakBroken = streakBroken,
+                lastActivityDate = user.LastActivityDate,
+                activityCalendar = calendar
             });
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while fetching streak for user {UserId}: {ErrorMessage}", 
+                userId, ex.Message);
+            return StatusCode(500, new { 
+                message = $"An error occurred while retrieving streak information", 
+                error = ex.Message
+            });
+        }
+    }
 
-        // Return streak information
-        return Ok(new { 
-            currentStreak = user.CurrentStreak,
-            maxStreak = user.MaxStreak,
-            streakBroken = streakBroken,
-            lastActivityDate = user.LastActivityDate,
-            activityCalendar = calendar
-        });
-    }
-    catch (Exception ex)
+    // Admin endpoint to review activity completions
+    [HttpPatch("review/{completionId}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ReviewActivityCompletion(int completionId, [FromBody] ActivityReviewDto reviewData)
     {
-        _logger.LogError(ex, "Error occurred while fetching streak for user {UserId}: {ErrorMessage}", 
-            userId, ex.Message);
-        return StatusCode(500, new { 
-            message = $"An error occurred while retrieving streak information", 
-            error = ex.Message
-        });
+        try
+        {
+            _logger.LogInformation("Admin reviewing activity completion {CompletionId}", completionId);
+            
+            // Check if completion exists
+            var completionQuery = @"
+                SELECT id, userid, activityid, reviewstatus, pointsearned 
+                FROM activitycompletions 
+                WHERE id = @completionId";
+                
+            var completionParam = new NpgsqlParameter("completionId", completionId);
+            
+            // Get the completion record
+            ActivityCompletion completion = null;
+            using (var command = _context.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = completionQuery;
+                command.Parameters.Add(completionParam);
+
+                if (command.Connection.State != System.Data.ConnectionState.Open)
+                {
+                    command.Connection.Open();
+                }
+
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        completion = new ActivityCompletion
+                        {
+                            Id = reader.GetInt32(reader.GetOrdinal("id")),
+                            UserId = reader.GetInt32(reader.GetOrdinal("userid")),
+                            ActivityId = reader.GetInt32(reader.GetOrdinal("activityid")),
+                            ReviewStatus = reader.IsDBNull(reader.GetOrdinal("reviewstatus")) 
+                                ? "Pending Review" 
+                                : reader.GetString(reader.GetOrdinal("reviewstatus")),
+                            PointsEarned = reader.GetInt32(reader.GetOrdinal("pointsearned"))
+                        };
+                    }
+                }
+            }
+            
+            if (completion == null)
+            {
+                _logger.LogWarning("Activity completion with ID {CompletionId} not found", completionId);
+                return NotFound(new { message = $"Activity completion with ID {completionId} not found" });
+            }
+            
+            // Update the review status
+            var updateSql = @"
+                UPDATE activitycompletions 
+                SET reviewstatus = @reviewStatus, 
+                    adminnotes = @adminNotes
+                WHERE id = @completionId";
+                
+            var updateParams = new[]
+            {
+                new NpgsqlParameter("reviewStatus", reviewData.Status),
+                new NpgsqlParameter("adminNotes", reviewData.AdminNotes ?? (object)DBNull.Value),
+                new NpgsqlParameter("completionId", completionId)
+            };
+            
+            await _context.Database.ExecuteSqlRawAsync(updateSql, updateParams);
+            
+            // If the status is "Rejected", remove the points from the user
+            if (reviewData.Status == "Rejected")
+            {
+                // Get the user's current points
+                var userQuery = "SELECT id, points FROM users WHERE id = @userId";
+                var userParam = new NpgsqlParameter("userId", completion.UserId);
+                
+                var user = await _context.Users
+                    .FromSqlRaw(userQuery, userParam)
+                    .Select(u => new { u.Id, u.Points })
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync();
+                    
+                if (user != null)
+                {
+                    // Deduct the points
+                    var newPoints = Math.Max(0, user.Points - completion.PointsEarned); // Ensure points don't go below 0
+                    
+                    // Update user points
+                    var updateUserSql = "UPDATE users SET points = @points WHERE id = @userId";
+                    var updateUserParams = new[]
+                    {
+                        new NpgsqlParameter("points", newPoints),
+                        new NpgsqlParameter("userId", completion.UserId)
+                    };
+                    
+                    await _context.Database.ExecuteSqlRawAsync(updateUserSql, updateUserParams);
+                }
+            }
+
+            return Ok(new { 
+                message = $"Activity completion reviewed successfully. Status: {reviewData.Status}",
+                completionId = completionId,
+                status = reviewData.Status
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while reviewing activity completion {CompletionId}", completionId);
+            return StatusCode(500, new { 
+                message = $"An error occurred while reviewing the activity completion", 
+                error = ex.Message
+            });
+        }
     }
+
+    [HttpGet("debug-auth")]
+public IActionResult DebugAuth()
+{
+    var identity = HttpContext.User.Identity;
+    var isAuthenticated = identity?.IsAuthenticated ?? false;
+    
+    var claims = new List<object>();
+    
+    if (identity is ClaimsIdentity claimsIdentity)
+    {
+        claims = claimsIdentity.Claims.Select(c => new 
+        {
+            type = c.Type,
+            value = c.Value
+        }).ToList<object>();
+    }
+    
+    var isAdmin = HttpContext.User.IsInRole("Admin");
+    
+    return Ok(new
+    {
+        isAuthenticated,
+        userName = identity?.Name,
+        claims,
+        isAdmin,
+        roleClaimType = ClaimTypes.Role,
+        customRoleType = "role"
+    });
 }
 
     // DTO for activity completion requests
@@ -888,16 +1138,40 @@ public async Task<ActionResult<object>> GetUserStreak(int userId)
         public IFormFile? Image { get; set; } = null;
     }
 
-public class CreateActivityDto
+    // DTO for activity review requests
+    public class ActivityReviewDto
+    {
+        public string Status { get; set; } = "Approved"; // Approved, Rejected, Pending Review
+        public string? AdminNotes { get; set; }
+    }
+
+    public class CreateActivityDto
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public int PointsValue { get; set; }
+        public string Category { get; set; } = string.Empty;
+        public bool IsDaily { get; set; }
+        public bool IsWeekly { get; set; }
+        public bool IsOneTime { get; set; }
+        // Only include the properties that exist in your database
+    }
+
+    public class UpdateActivityDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public int PointsValue { get; set; }
+        public bool IsDaily { get; set; }
+        public bool IsWeekly { get; set; }
+        public bool IsOneTime { get; set; }
+    }
+
+public class DeleteActivityDto
 {
-    public string Title { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public int PointsValue { get; set; }
-    public string Category { get; set; } = string.Empty;
-    public bool IsDaily { get; set; }
-    public bool IsWeekly { get; set; }
-    public bool IsOneTime { get; set; }
-    // Only include the properties that exist in your database
+    public int Id { get; set; }
 }
 
     private bool ActivityExists(int id)
