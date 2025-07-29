@@ -10,27 +10,23 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
 
-// API base URL from environment variables
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80';
 
 const Dashboard = () => {
-  const { currentUser } = useAuth(); // Use the authenticated user from context
+  const { currentUser } = useAuth();
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Carbon impact data
   const [carbonImpact, setCarbonImpact] = useState({
     co2Reduced: 0,
     treesEquivalent: 0,
     waterSaved: 0
   });
-  // Chart data
   const [activityStats, setActivityStats] = useState({
     categoryCounts: [],
     weeklyActivity: []
   });
   const [pointsHistory, setPointsHistory] = useState([]);
-  // Level information
   const [levelInfo, setLevelInfo] = useState({
     currentLevel: 1,
     pointsToNextLevel: 100,
@@ -44,51 +40,49 @@ const Dashboard = () => {
     ]
   });
 
-  // Chart colors
   const COLORS = ['#4CAF50', '#8BC34A', '#CDDC39', '#FFC107', '#FF9800', '#009688'];
+
+  // Debug: log currentUser on every render
+  console.log('[Dashboard] currentUser:', currentUser);
 
   useEffect(() => {
     const fetchUserData = async () => {
-      // If no user is authenticated, don't attempt to fetch data
+      console.log('[Dashboard] fetchUserData called');
       if (!currentUser) {
         setLoading(false);
         return;
       }
 
+      const userId = currentUser.userId;
+      console.log('[Dashboard] Using userId:', userId);
+
+      if (!userId) {
+        setError('No user ID available');
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Get userId from authentication context or localStorage
-        const userId = currentUser.id || localStorage.getItem('userId');
-
-        if (!userId) {
-          throw new Error('No user ID available');
-        }
-
-        // Use the correct API URL with appropriate headers
-        const token = localStorage.getItem('token');
+        const token = currentUser.token || localStorage.getItem('token');
+        console.log('[Dashboard] Fetching user data for userId:', userId);
         const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        console.log(`Fetching user data for ID: ${userId}, Status: ${response.status}`);
-
         if (!response.ok) {
-          // Try to get error details from response
           let errorMessage = 'Failed to fetch user data';
           try {
             const errorData = await response.json();
             errorMessage = errorData.message || errorMessage;
           } catch {
-            // If response is not JSON, use status text
             errorMessage = `${errorMessage} (${response.status}: ${response.statusText})`;
           }
           throw new Error(errorMessage);
         }
 
         const userData = await response.json();
-        console.log('User data fetched successfully:', userData);
-        setUserData(userData);
+        console.log('[Dashboard] userData from API:', userData);
+        setUserData({ ...userData, userId }); // Ensure userId is present
 
         // Fetch level information
         try {
@@ -103,7 +97,6 @@ const Dashboard = () => {
             setLevelInfo(levelData);
           } else {
             console.warn('Level info not available, calculating locally');
-            // Calculate level based on points
             const points = userData.points || 0;
             const level = calculateLevel(points);
             setLevelInfo({
@@ -121,7 +114,6 @@ const Dashboard = () => {
           }
         } catch (levelErr) {
           console.error('Error fetching level info:', levelErr);
-          // Calculate level locally as fallback
           const points = userData.points || 0;
           const level = calculateLevel(points);
           setLevelInfo({
@@ -151,16 +143,14 @@ const Dashboard = () => {
             setCarbonImpact(carbonData);
           } else {
             console.warn('Carbon impact data not available, using estimates based on points');
-            // Fallback: Estimate carbon impact based on user points
             setCarbonImpact({
-              co2Reduced: Math.round(userData.points * 0.5), // kg of CO2
-              treesEquivalent: Math.round(userData.points * 0.02), // equivalent trees planted
-              waterSaved: Math.round(userData.points * 2) // liters of water
+              co2Reduced: Math.round(userData.points * 0.5),
+              treesEquivalent: Math.round(userData.points * 0.02),
+              waterSaved: Math.round(userData.points * 2)
             });
           }
         } catch (carbonErr) {
           console.error('Error fetching carbon impact:', carbonErr);
-          // Use fallback calculations
           setCarbonImpact({
             co2Reduced: Math.round(userData.points * 0.5),
             treesEquivalent: Math.round(userData.points * 0.02),
@@ -181,7 +171,6 @@ const Dashboard = () => {
             setActivityStats(statsData);
           } else {
             console.warn('Activity stats not available, using sample data');
-            // Fallback: Use sample data for demonstration
             setActivityStats({
               categoryCounts: [
                 { name: 'Waste Reduction', value: 5 },
@@ -214,7 +203,6 @@ const Dashboard = () => {
             setPointsHistory(pointsData);
           } else {
             console.warn('Points history not available, using sample data');
-            // Generate sample points data with increasing trend
             const samplePoints = [
               { date: 'Week 1', points: Math.floor(Math.random() * 50) + 10 },
               { date: 'Week 2', points: Math.floor(Math.random() * 50) + 20 },
@@ -225,7 +213,6 @@ const Dashboard = () => {
           }
         } catch (statsErr) {
           console.error('Error fetching statistics:', statsErr);
-          // Provide fallback data
           setActivityStats({
             categoryCounts: [
               { name: 'Waste Reduction', value: 5 },
@@ -261,6 +248,7 @@ const Dashboard = () => {
     };
 
     fetchUserData();
+    // eslint-disable-next-line
   }, [currentUser]);
 
   // Helper functions for level calculations
@@ -273,25 +261,21 @@ const Dashboard = () => {
   };
 
   const calculatePointsToNextLevel = (points, level) => {
-    if (level === 5) return 0; // Max level reached
+    if (level === 5) return 0;
     const nextLevelThresholds = [100, 250, 500, 1000];
     return nextLevelThresholds[level - 1] - points;
   };
 
   const calculateProgressPercentage = (points, level) => {
-    if (level === 5) return 100; // Max level reached
-    
+    if (level === 5) return 100;
     const levelThresholds = [0, 100, 250, 500, 1000];
     const currentLevelThreshold = levelThresholds[level - 1];
     const nextLevelThreshold = levelThresholds[level];
-    
     const pointsInCurrentLevel = points - currentLevelThreshold;
     const pointsRequiredForNextLevel = nextLevelThreshold - currentLevelThreshold;
-    
     return Math.round((pointsInCurrentLevel / pointsRequiredForNextLevel) * 100);
   };
 
-  // Redirect to login if not authenticated
   if (!currentUser && !loading) {
     return <Navigate to="/login" />;
   }
@@ -309,7 +293,7 @@ const Dashboard = () => {
             <span className="stat-value">{userData.points}</span>
             <span className="stat-label">Points</span>
           </div>
-          <StreakCounter userId={userData.id} />
+          <StreakCounter userId={userData.userId} />
         </div>
       </header>
 
@@ -445,13 +429,13 @@ const Dashboard = () => {
           <h3>Log Your Actions</h3>
           <Link to="/activities" className="view-all">View All</Link>
         </div>
-        <ActivitiesPage userId={userData.id} />
+        <ActivitiesPage userId={userData.userId} />
 
         <div className="section-header">
           <h3>Active Challenges</h3>
           <Link to="/challenges" className="view-all">View All</Link>
         </div>
-        <ActiveChallenges userId={userData.id} />
+        <ActiveChallenges userId={userData.userId} />
       </section>
     </div>
   );

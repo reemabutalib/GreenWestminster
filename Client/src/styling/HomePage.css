@@ -239,3 +239,44 @@
     max-width: 100%;
   }
 }
+
+.recycling-map-section {
+  margin: 3rem 0;
+  text-align: center;
+}
+.campus-toggle {
+  margin-bottom: 1rem;
+}
+.campus-btn {
+  margin: 0 0.3rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  background: #e0e0e0;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+.campus-btn.active {
+  background: #4CAF50;
+  color: #fff;
+}
+.map-container {
+  margin: 1rem 0;
+}
+.bin-list {
+  margin-top: 1rem;
+  list-style: none;
+  padding: 0;
+  color: #388e3c;
+  font-weight: 500;
+}
+
+.map-image-wrapper img {
+  width: 600px;
+  height: 500px;
+  max-width: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+  opacity: 0.7;
+}

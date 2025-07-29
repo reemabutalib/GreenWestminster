@@ -1,8 +1,44 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import '../styling/HomePage.css';
 
+const campusList = [
+  { name: 'Cavendish', img: '/maps/cavendish-map.png' },
+  { name: 'Marylebone', img: '/maps/marylebone-map.png' },
+  { name: 'Regent Street', img: '/maps/regent-map.png' },
+  { name: 'Harrow', img: '/maps/harrow-map.png' },
+  { name: 'Little Titchfield Street', img: '/maps/lts-map.png' },
+  { name: 'Wells Street', img: '/maps/wells-map.png' },
+];
+
+const recyclingBinLocations = {
+  Cavendish: [
+    { name: 'Ground Floor Lobby', x: 60, y: 120 },
+    { name: 'Canteen', x: 180, y: 80 },
+  ],
+  Marylebone: [
+    { name: 'Main Entrance', x: 100, y: 100 },
+    { name: 'Library', x: 200, y: 150 },
+  ],
+  'Regent Street': [
+    { name: 'Reception', x: 80, y: 90 },
+    { name: 'Student Lounge', x: 160, y: 130 },
+  ],
+  Harrow: [
+    { name: 'Art Block', x: 120, y: 110 },
+    { name: 'Café', x: 210, y: 70 },
+  ],
+  'Little Titchfield Street': [
+    { name: 'Main Hall', x: 90, y: 100 },
+  ],
+  'Wells Street': [
+    { name: 'Entrance', x: 100, y: 120 },
+  ],
+};
+
 const HomePage = () => {
+  const [selectedCampus, setSelectedCampus] = useState('Cavendish');
+
   return (
     <div className="home-page">
       <section className="hero-section">
@@ -67,6 +103,64 @@ const HomePage = () => {
             <h3>Earn Recognition</h3>
             <p>Climb the leaderboard and showcase your environmental commitment</p>
           </div>
+        </div>
+      </section>
+
+      {/* Recycling Bins Map Section */}
+      <section className="recycling-map-section">
+        <h2>Find Recycling Bins on Campus</h2>
+        <div className="campus-toggle">
+          {campusList.map(campus => (
+            <button
+              key={campus.name}
+              className={`campus-btn${selectedCampus === campus.name ? ' active' : ''}`}
+              onClick={() => setSelectedCampus(campus.name)}
+            >
+              {campus.name}
+            </button>
+          ))}
+        </div>
+        <div className="map-container">
+          {/* Placeholder map image or box */}
+          <div className="map-image-wrapper" style={{ position: 'relative', width: 500, height: 400, margin: '0 auto', background: '#e8f5e9', borderRadius: 12 }}>
+            {/* Replace src with your own placeholder images if you have them */}
+            <img
+              src={campusList.find(c => c.name === selectedCampus)?.img || ''}
+              alt={`${selectedCampus} campus map`}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12, opacity: 0.7 }}
+              onError={e => { e.target.style.display = 'none'; }}
+            />
+            {/* Show bin locations as icons */}
+            {recyclingBinLocations[selectedCampus].map(bin => (
+              <div
+                key={bin.name}
+                style={{
+                  position: 'absolute',
+                  left: bin.x,
+                  top: bin.y,
+                  transform: 'translate(-50%, -50%)',
+                  background: '#fff',
+                  borderRadius: '50%',
+                  width: 32,
+                  height: 32,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                  border: '2px solid #4CAF50',
+                  cursor: 'pointer',
+                }}
+                title={bin.name}
+              >
+                ♻️
+              </div>
+            ))}
+          </div>
+          <ul className="bin-list">
+            {recyclingBinLocations[selectedCampus].map(bin => (
+              <li key={bin.name}>♻️ {bin.name}</li>
+            ))}
+          </ul>
         </div>
       </section>
 

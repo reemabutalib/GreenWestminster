@@ -45,28 +45,33 @@ const Login = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (validateForm()) {
-      setIsSubmitting(true);
-      setServerError('');
-      
-      try {
-        const result = await login(formData.email, formData.password);
-        
-        if (result.success) {
-          // Redirect to dashboard
-          navigate('/dashboard');
+  e.preventDefault();
+
+  if (validateForm()) {
+    setIsSubmitting(true);
+    setServerError('');
+
+    try {
+      const result = await login(formData.email, formData.password);
+
+      if (result.success) {
+        // Get the current user from localStorage or context
+        const userRole = localStorage.getItem('userRole');
+        if (userRole === 'Admin') {
+          navigate('/admin/dashboard');
         } else {
-          setServerError(result.error || 'Failed to login');
+          navigate('/dashboard');
         }
-      } catch (error) {
-        setServerError(error.message || 'An error occurred during login');
-      } finally {
-        setIsSubmitting(false);
+      } else {
+        setServerError(result.error || 'Failed to login');
       }
+    } catch (error) {
+      setServerError(error.message || 'An error occurred during login');
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  }
+};
 
   return (
     <div className="auth-container">
