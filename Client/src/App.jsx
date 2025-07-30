@@ -14,6 +14,7 @@ import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import EventsPage from './components/EventsPage';
 import AboutUs from './components/AboutUs';
+import AvatarCustomizer from './components/AvatarCustomizer';
 
 // Import admin components
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -100,6 +101,12 @@ function AppContent() {
               <ProtectedRoute>
                 <ProfilePage />
               </ProtectedRoute>
+            } />
+
+            <Route path="/profile/avatar" element={
+            <ProtectedRoute>
+            <AvatarCustomizer />
+            </ProtectedRoute>
             } />
             
             {/* Admin routes */}

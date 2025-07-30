@@ -284,3 +284,20 @@
     gap: 0.5rem;
   }
 }
+
+.dashboard-avatar-block {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.dashboard-avatar-img {
+  border: 3px solid #4CAF50;
+  background: #fff;
+}
+.customize-avatar-link {
+  margin-left: 1rem;
+  color: #388E3C;
+  font-weight: 500;
+  text-decoration: underline;
+  cursor: pointer;
+}

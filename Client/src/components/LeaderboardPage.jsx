@@ -18,7 +18,7 @@ const LeaderboardPage = () => {
       
       try {
         // URL includes timeFrame as a query parameter
-        const url = `/api/users/leaderboard?timeFrame=${timeFrame}`;
+        const url = `http://localhost:80/api/users/leaderboard?timeFrame=${timeFrame}`;
         const response = await fetch(url);
         
         if (!response.ok) {

@@ -13,15 +13,21 @@ const Register = () => {
     confirmPassword: '',
     course: '',
     yearOfStudy: 1,
-    accommodationType: ''
+    accommodationType: '',
+    consentAnalytics: false,
+    preferredContact: '',
+    phoneNumber: ''
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState('');
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    const { name, value, type, checked } = e.target;
+    setFormData({ 
+      ...formData, 
+      [name]: type === 'checkbox' ? checked : value
+    });
     
     // Clear error when user starts typing in a field
     if (errors[name]) {
@@ -65,6 +71,23 @@ const Register = () => {
     if (!formData.accommodationType) {
       newErrors.accommodationType = 'Accommodation type is required';
     }
+
+      // Consent checkbox validation
+    if (!formData.consentAnalytics) {
+      newErrors.consentAnalytics = 'You must consent to sharing engagement data';
+    }
+
+    // Preferred contact validation
+    if (!formData.preferredContact) {
+      newErrors.preferredContact = 'Please select your preferred method of communication';
+    }
+    if (formData.preferredContact === 'number') {
+      if (!formData.phoneNumber.trim()) {
+        newErrors.phoneNumber = 'Please enter your phone number';
+      } else if (!/^\+?\d{7,15}$/.test(formData.phoneNumber.trim())) {
+        newErrors.phoneNumber = 'Please enter a valid phone number';
+      }
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -95,7 +118,10 @@ const Register = () => {
           formData.confirmPassword, // Added confirmPassword parameter
           formData.course,
           formData.yearOfStudy,
-          formData.accommodationType
+          formData.accommodationType,
+          formData.consentAnalytics,
+          formData.preferredContact,
+          formData.phoneNumber
         );
         
         if (result.success) {
@@ -224,6 +250,65 @@ const Register = () => {
             </select>
             {errors.accommodationType && <span className="error-message">{errors.accommodationType}</span>}
           </div>
+
+
+          {/* Consent Checkbox */}
+          <div className="form-group">
+            <label>
+              <input
+                type="checkbox"
+                name="consentAnalytics"
+                checked={formData.consentAnalytics}
+                onChange={handleChange}
+              />
+              I consent to sharing my engagement/analytics data for admin insights.
+            </label>
+            {errors.consentAnalytics && <span className="error-message">{errors.consentAnalytics}</span>}
+          </div>
+
+          {/* Preferred Contact */}
+          <div className="form-group">
+            <label>Preferred method of communication:</label>
+            <div>
+              <label>
+                <input
+                  type="radio"
+                  name="preferredContact"
+                  value="email"
+                  checked={formData.preferredContact === 'email'}
+                  onChange={handleChange}
+                />
+                Email
+              </label>
+              <label style={{ marginLeft: '1rem' }}>
+                <input
+                  type="radio"
+                  name="preferredContact"
+                  value="number"
+                  checked={formData.preferredContact === 'number'}
+                  onChange={handleChange}
+                />
+                Phone Number
+              </label>
+            </div>
+            {errors.preferredContact && <span className="error-message">{errors.preferredContact}</span>}
+          </div>
+
+          {/* Conditional Phone Number Input */}
+          {formData.preferredContact === 'number' && (
+            <div className="form-group">
+              <label htmlFor="phoneNumber">Phone Number</label>
+              <input
+                type="tel"
+                id="phoneNumber"
+                name="phoneNumber"
+                value={formData.phoneNumber}
+                onChange={handleChange}
+                placeholder="e.g. +447123456789"
+              />
+              {errors.phoneNumber && <span className="error-message">{errors.phoneNumber}</span>}
+            </div>
+          )}
           
           <button 
             type="submit"

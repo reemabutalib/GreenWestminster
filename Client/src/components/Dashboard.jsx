@@ -288,6 +288,21 @@ const Dashboard = () => {
     <div className="dashboard">
       <header className="dashboard-header">
         <h2>Welcome back, {userData.username}!</h2>
+        <div className="dashboard-avatar-block">
+    <img
+      src={
+        userData.avatarStyle
+          ? `/avatars/${userData.avatarStyle}.png`
+          : '/avatars/classic.png'
+      }
+      alt="Your avatar"
+      className="dashboard-avatar-img"
+      style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', marginRight: 24 }}
+    />
+    <Link to="/profile/avatar" className="customize-avatar-link">
+      Customize Avatar
+    </Link>
+  </div>
         <div className="user-stats">
           <div className="stat">
             <span className="stat-value">{userData.points}</span>

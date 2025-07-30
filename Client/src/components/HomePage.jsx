@@ -134,6 +134,10 @@ const HomePage = () => {
             {recyclingBinLocations[selectedCampus].map(bin => (
               <div
                 key={bin.name}
+                title={`Recycling bin: ${bin.name}`}
+                aria-label={`Recycling bin: ${bin.name}`}
+                tabIndex={0}
+                role="img"
                 style={{
                   position: 'absolute',
                   left: bin.x,
@@ -150,7 +154,6 @@ const HomePage = () => {
                   border: '2px solid #4CAF50',
                   cursor: 'pointer',
                 }}
-                title={bin.name}
               >
                 ♻️
               </div>

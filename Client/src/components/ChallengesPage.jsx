@@ -190,8 +190,8 @@ const ChallengesPage = () => {
       <div className="challenges-grid">
         {challenges.map(challenge => (
           <div key={challenge.id} className="challenge-card">
-            <div className={`challenge-category ${challenge.category.toLowerCase().replace(' ', '-')}`}>
-              {challenge.category}
+            <div className={`challenge-category ${challenge.category ? challenge.category.toLowerCase().replace(' ', '-') : 'general'}`}>
+              {challenge.category || 'General'}
             </div>
             
             <h3>{challenge.title}</h3>

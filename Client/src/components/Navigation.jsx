@@ -55,6 +55,7 @@ const Navigation = () => {
             <Link to="/leaderboard" className={location.pathname === '/leaderboard' ? 'active' : ''}>
               Leaderboard
             </Link>
+            
           </>
         )}
         
