@@ -305,7 +305,7 @@ const Dashboard = () => {
   </div>
         <div className="user-stats">
           <div className="stat">
-            <span className="stat-value">{userData.points}</span>
+            <span className="stat-value" data-testid="user-points">{userData.points}</span>
             <span className="stat-label">Points</span>
           </div>
           <StreakCounter userId={userData.userId} />

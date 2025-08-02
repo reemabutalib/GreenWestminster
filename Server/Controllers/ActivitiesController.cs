@@ -1,7 +1,7 @@
-using Server.Data;
 using Server.Models;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -10,7 +10,10 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Npgsql;
 using System.Security.Claims;
-using System.Text.Json;
+using Server.Services.Interfaces;
+using Server.Services.Implementations;
+using Server.DTOs;
+using Server.Data;
 
 namespace Server.Controllers;
 
@@ -18,15 +21,14 @@ namespace Server.Controllers;
 [Route("api/[controller]")]
 public class ActivitiesController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IActivitiesService _activitiesService;
     private readonly ILogger<ActivitiesController> _logger;
+    private readonly AppDbContext _context;
 
-    // Constructor with debugging options enabled
-    public ActivitiesController(AppDbContext context, ILogger<ActivitiesController> logger)
+    public ActivitiesController(IActivitiesService activitiesService, ILogger<ActivitiesController> logger)
     {
-        _context = context;
+        _activitiesService = activitiesService;
         _logger = logger;
-        _context.Database.SetCommandTimeout(60); // Increase timeout for debugging
     }
 
     // GET: api/activities
@@ -36,23 +38,19 @@ public class ActivitiesController : ControllerBase
         try
         {
             _logger.LogInformation("Fetching all sustainable activities");
-            
-            var activities = await _context.SustainableActivities
-                .AsNoTracking()
-                .Select(a => new 
-                {
-                    id = a.Id,
-                    title = a.Title,
-                    description = a.Description,
-                    category = a.Category,
-                    pointsValue = a.PointsValue,
-                    isDaily = a.IsDaily,
-                    isWeekly = a.IsWeekly,
-                    isOneTime = a.IsOneTime
-                })
-                .ToListAsync();
-                
-            return Ok(activities);
+            var activities = await _activitiesService.GetAllActivitiesAsync();
+            var result = activities.Select(a => new
+            {
+                id = a.Id,
+                title = a.Title,
+                description = a.Description,
+                category = a.Category,
+                pointsValue = a.PointsValue,
+                isDaily = a.IsDaily,
+                isWeekly = a.IsWeekly,
+                isOneTime = a.IsOneTime
+            });
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -68,30 +66,23 @@ public class ActivitiesController : ControllerBase
         try
         {
             _logger.LogInformation("Fetching activity with ID: {Id}", id);
-            
-            var activity = await _context.SustainableActivities
-                .AsNoTracking()
-                .Where(a => a.Id == id)
-                .Select(a => new 
-                {
-                    id = a.Id,
-                    title = a.Title,
-                    description = a.Description,
-                    category = a.Category,
-                    pointsValue = a.PointsValue,
-                    isDaily = a.IsDaily,
-                    isWeekly = a.IsWeekly,
-                    isOneTime = a.IsOneTime
-                })
-                .FirstOrDefaultAsync();
-
+            var activity = await _activitiesService.GetActivityByIdAsync(id);
             if (activity == null)
             {
                 _logger.LogWarning("Activity with ID: {Id} not found", id);
                 return NotFound(new { message = $"Activity with ID: {id} not found" });
             }
-
-            return Ok(activity);
+            return Ok(new
+            {
+                id = activity.Id,
+                title = activity.Title,
+                description = activity.Description,
+                category = activity.Category,
+                pointsValue = activity.PointsValue,
+                isDaily = activity.IsDaily,
+                isWeekly = activity.IsWeekly,
+                isOneTime = activity.IsOneTime
+            });
         }
         catch (Exception ex)
         {
@@ -102,70 +93,40 @@ public class ActivitiesController : ControllerBase
 
     // POST: api/activities
     [HttpPost]
-[Authorize(Policy = "AdminPolicy")]
-public async Task<ActionResult<object>> CreateActivity(CreateActivityDto activityDto)
-{
-    try
+    [Authorize(Policy = "AdminPolicy")]
+    public async Task<ActionResult<object>> CreateActivity(CreateActivityDto activityDto)
     {
-        _logger.LogInformation("Admin creating new activity: {Title}", activityDto.Title);
-        
-        if (activityDto == null)
+        try
         {
-            return BadRequest(new { message = "Activity data is required" });
-        }
-            
-            // Create activity with only the fields we know exist in the database
-            var sql = @"
-                INSERT INTO sustainableactivities 
-                    (title, description, category, pointsvalue, isdaily, isweekly, isonetime)
-                VALUES 
-                    (@title, @description, @category, @pointsValue, @isDaily, @isWeekly, @isOneTime)
-                RETURNING id";
-            
-            var parameters = new[]
-            {
-                new NpgsqlParameter("title", activityDto.Title),
-                new NpgsqlParameter("description", activityDto.Description),
-                new NpgsqlParameter("category", activityDto.Category),
-                new NpgsqlParameter("pointsValue", activityDto.PointsValue),
-                new NpgsqlParameter("isDaily", activityDto.IsDaily),
-                new NpgsqlParameter("isWeekly", activityDto.IsWeekly),
-                new NpgsqlParameter("isOneTime", activityDto.IsOneTime)
-            };
-            
-            // Execute the SQL directly to bypass EF Core's mapping
-            int newActivityId;
-            using (var command = _context.Database.GetDbConnection().CreateCommand())
-            {
-                command.CommandText = sql;
-                foreach (var param in parameters)
-                {
-                    command.Parameters.Add(param);
-                }
+            _logger.LogInformation("Admin creating new activity: {Title}", activityDto.Title);
 
-                if (command.Connection.State != System.Data.ConnectionState.Open)
-                {
-                    command.Connection.Open();
-                }
+            if (activityDto == null)
+                return BadRequest(new { message = "Activity data is required" });
 
-                // Get the ID of the newly inserted activity
-                newActivityId = Convert.ToInt32(await command.ExecuteScalarAsync());
-            }
-            
-            // Return the created activity
-            var createdActivity = new
+            var activity = new SustainableActivity
             {
-                id = newActivityId,
-                title = activityDto.Title,
-                description = activityDto.Description,
-                category = activityDto.Category,
-                pointsValue = activityDto.PointsValue,
-                isDaily = activityDto.IsDaily,
-                isWeekly = activityDto.IsWeekly,
-                isOneTime = activityDto.IsOneTime
+                Title = activityDto.Title,
+                Description = activityDto.Description,
+                Category = activityDto.Category,
+                PointsValue = activityDto.PointsValue,
+                IsDaily = activityDto.IsDaily,
+                IsWeekly = activityDto.IsWeekly,
+                IsOneTime = activityDto.IsOneTime
             };
 
-            return CreatedAtAction(nameof(GetActivity), new { id = newActivityId }, createdActivity);
+            var created = await _activitiesService.CreateActivityAsync(activity);
+
+            return CreatedAtAction(nameof(GetActivity), new { id = created.Id }, new
+            {
+                id = created.Id,
+                title = created.Title,
+                description = created.Description,
+                category = created.Category,
+                pointsValue = created.PointsValue,
+                isDaily = created.IsDaily,
+                isWeekly = created.IsWeekly,
+                isOneTime = created.IsOneTime
+            });
         }
         catch (Exception ex)
         {
@@ -174,139 +135,83 @@ public async Task<ActionResult<object>> CreateActivity(CreateActivityDto activit
         }
     }
 
-// PUT: api/activities
-[HttpPut]
-[Authorize(Policy = "AdminPolicy")]
-public async Task<ActionResult<object>> UpdateActivity(UpdateActivityDto activityDto)
-{
-    try
+    // PUT: api/activities
+    [HttpPut]
+    [Authorize(Policy = "AdminPolicy")]
+    public async Task<ActionResult<object>> UpdateActivity(UpdateActivityDto activityDto)
     {
-        _logger.LogInformation("Admin updating activity: {Id} - {Title}", activityDto.Id, activityDto.Title);
-        
-        if (activityDto == null || activityDto.Id <= 0)
+        try
         {
-            return BadRequest(new { message = "Activity data is invalid" });
-        }
-        
-        // Check if activity exists, using direct SQL to avoid any mapping issues
-        var sql = "SELECT id FROM sustainableactivities WHERE id = @id";
-        var param = new NpgsqlParameter("id", activityDto.Id);
-        
-        var exists = await _context.Database.SqlQueryRaw<int>(sql, param).AnyAsync();
-        
-        if (!exists)
-        {
-            return NotFound(new { message = $"Activity with ID: {activityDto.Id} not found" });
-        }
-        
-        // Update activity with provided fields using direct SQL to avoid mapping issues
-        var updateSql = @"
-            UPDATE sustainableactivities
-            SET 
-                title = @title, 
-                description = @description, 
-                category = @category, 
-                pointsvalue = @pointsValue, 
-                isdaily = @isDaily, 
-                isweekly = @isWeekly, 
-                isonetime = @isOneTime
-            WHERE id = @id";
-        
-        var parameters = new[]
-        {
-            new NpgsqlParameter("title", activityDto.Title),
-            new NpgsqlParameter("description", activityDto.Description),
-            new NpgsqlParameter("category", activityDto.Category),
-            new NpgsqlParameter("pointsValue", activityDto.PointsValue),
-            new NpgsqlParameter("isDaily", activityDto.IsDaily),
-            new NpgsqlParameter("isWeekly", activityDto.IsWeekly),
-            new NpgsqlParameter("isOneTime", activityDto.IsOneTime),
-            new NpgsqlParameter("id", activityDto.Id)
-        };
-        
-        // Execute the update
-        await _context.Database.ExecuteSqlRawAsync(updateSql, parameters);
-        
-        // Return the updated activity
-        return Ok(new
-        {
-            success = true,
-            activity = new
+            _logger.LogInformation("Admin updating activity: {Id} - {Title}", activityDto.Id, activityDto.Title);
+
+            if (activityDto == null || activityDto.Id <= 0)
+                return BadRequest(new { message = "Activity data is invalid" });
+
+            var activity = new SustainableActivity
             {
-                id = activityDto.Id,
-                title = activityDto.Title,
-                description = activityDto.Description,
-                category = activityDto.Category,
-                pointsValue = activityDto.PointsValue,
-                isDaily = activityDto.IsDaily,
-                isWeekly = activityDto.IsWeekly,
-                isOneTime = activityDto.IsOneTime
-            }
-        });
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Error occurred while updating activity: {Error}", ex.Message);
-        return StatusCode(500, new { message = "An error occurred while updating the activity", error = ex.Message });
-    }
-}
+                Id = activityDto.Id,
+                Title = activityDto.Title,
+                Description = activityDto.Description,
+                Category = activityDto.Category,
+                PointsValue = activityDto.PointsValue,
+                IsDaily = activityDto.IsDaily,
+                IsWeekly = activityDto.IsWeekly,
+                IsOneTime = activityDto.IsOneTime
+            };
 
-// DELETE: api/activities
-[HttpDelete]
-[Authorize(Policy = "AdminPolicy")]
-public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivityDto deleteDto)
-{
-    try
-    {
-        if (deleteDto == null || deleteDto.Id <= 0)
-        {
-            return BadRequest(new { message = "Valid activity ID is required" });
+            var updated = await _activitiesService.UpdateActivityAsync(activity);
+
+            if (!updated)
+                return NotFound(new { message = $"Activity with ID: {activityDto.Id} not found" });
+
+            return Ok(new
+            {
+                success = true,
+                activity = new
+                {
+                    id = activity.Id,
+                    title = activity.Title,
+                    description = activity.Description,
+                    category = activity.Category,
+                    pointsValue = activity.PointsValue,
+                    isDaily = activity.IsDaily,
+                    isWeekly = activity.IsWeekly,
+                    isOneTime = activity.IsOneTime
+                }
+            });
         }
-
-        _logger.LogInformation("Admin deleting activity with ID: {Id} via body payload", deleteDto.Id);
-        
-        // Check if activity exists using direct SQL
-        var checkSql = "SELECT COUNT(*) FROM sustainableactivities WHERE id = @id";
-        var checkParam = new NpgsqlParameter("id", deleteDto.Id);
-        
-        var exists = await _context.Database.SqlQueryRaw<int>(checkSql, checkParam).AnyAsync();
-        
-        if (!exists)
+        catch (Exception ex)
         {
-            _logger.LogWarning("Activity with ID: {Id} not found during delete operation", deleteDto.Id);
-            return NotFound(new { message = $"Activity with ID: {deleteDto.Id} not found" });
+            _logger.LogError(ex, "Error occurred while updating activity: {Error}", ex.Message);
+            return StatusCode(500, new { message = "An error occurred while updating the activity", error = ex.Message });
         }
-
-        // Check if activity has been completed by any users with direct SQL
-        var completionsSql = "SELECT id FROM activitycompletions WHERE activityid = @activityId";
-        var completionsParam = new NpgsqlParameter("activityId", deleteDto.Id);
-        
-        var completions = await _context.Database.SqlQueryRaw<int>(completionsSql, completionsParam).ToListAsync();
-        
-        if (completions.Any())
-        {
-            _logger.LogInformation("Removing {Count} activity completion records for activity with ID: {Id}", 
-                completions.Count, deleteDto.Id);
-                
-            // Delete completions first to avoid foreign key constraints
-            var deleteCompletionsSql = "DELETE FROM activitycompletions WHERE activityid = @activityId";
-            await _context.Database.ExecuteSqlRawAsync(deleteCompletionsSql, completionsParam);
-        }
-
-        // Now delete the activity
-        var deleteActivitySql = "DELETE FROM sustainableactivities WHERE id = @id";
-        await _context.Database.ExecuteSqlRawAsync(deleteActivitySql, checkParam);
-        
-        _logger.LogInformation("Activity with ID: {Id} successfully deleted by admin", deleteDto.Id);
-
-        return Ok(new { message = $"Activity with ID: {deleteDto.Id} successfully deleted" });
     }
-    catch (Exception ex)
+
+    // DELETE: api/activities
+    [HttpDelete]
+    [Authorize(Policy = "AdminPolicy")]
+    public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivityDto deleteDto)
     {
-        _logger.LogError(ex, "Error occurred while deleting activity with ID from body: {Error}", ex.Message);
-        return StatusCode(500, new { message = "An error occurred while deleting the activity", error = ex.Message });
+        try
+        {
+            if (deleteDto == null || deleteDto.Id <= 0)
+                return BadRequest(new { message = "Valid activity ID is required" });
+
+            _logger.LogInformation("Admin deleting activity with ID: {Id} via body payload", deleteDto.Id);
+
+            var deleted = await _activitiesService.DeleteActivityAsync(deleteDto.Id);
+
+            if (!deleted)
+                return NotFound(new { message = $"Activity with ID: {deleteDto.Id} not found" });
+
+            return Ok(new { message = $"Activity with ID: {deleteDto.Id} successfully deleted" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while deleting activity with ID from body: {Error}", ex.Message);
+            return StatusCode(500, new { message = "An error occurred while deleting the activity", error = ex.Message });
+        }
     }
-}
 
     // GET: api/activities/category/waste-reduction
     [HttpGet("category/{category}")]
@@ -315,24 +220,19 @@ public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivit
         try
         {
             _logger.LogInformation("Fetching activities by category: {Category}", category);
-            
-            var activities = await _context.SustainableActivities
-                .AsNoTracking()
-                .Where(a => EF.Functions.ILike(a.Category, $"%{category}%"))
-                .Select(a => new
-                {
-                    id = a.Id,
-                    title = a.Title,
-                    description = a.Description,
-                    category = a.Category,
-                    pointsValue = a.PointsValue,
-                    isDaily = a.IsDaily,
-                    isWeekly = a.IsWeekly,
-                    isOneTime = a.IsOneTime
-                })
-                .ToListAsync();
-
-            return Ok(activities);
+            var activities = await _activitiesService.GetActivitiesByCategoryAsync(category);
+            var result = activities.Select(a => new
+            {
+                id = a.Id,
+                title = a.Title,
+                description = a.Description,
+                category = a.Category,
+                pointsValue = a.PointsValue,
+                isDaily = a.IsDaily,
+                isWeekly = a.IsWeekly,
+                isOneTime = a.IsOneTime
+            });
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -348,24 +248,19 @@ public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivit
         try
         {
             _logger.LogInformation("Fetching daily activities");
-            
-            var activities = await _context.SustainableActivities
-                .AsNoTracking()
-                .Where(a => a.IsDaily)
-                .Select(a => new
-                {
-                    id = a.Id,
-                    title = a.Title,
-                    description = a.Description,
-                    category = a.Category,
-                    pointsValue = a.PointsValue,
-                    isDaily = a.IsDaily,
-                    isWeekly = a.IsWeekly,
-                    isOneTime = a.IsOneTime
-                })
-                .ToListAsync();
-
-            return Ok(activities);
+            var activities = await _activitiesService.GetDailyActivitiesAsync();
+            var result = activities.Select(a => new
+            {
+                id = a.Id,
+                title = a.Title,
+                description = a.Description,
+                category = a.Category,
+                pointsValue = a.PointsValue,
+                isDaily = a.IsDaily,
+                isWeekly = a.IsWeekly,
+                isOneTime = a.IsOneTime
+            });
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -381,24 +276,19 @@ public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivit
         try
         {
             _logger.LogInformation("Fetching weekly activities");
-            
-            var activities = await _context.SustainableActivities
-                .AsNoTracking()
-                .Where(a => a.IsWeekly)
-                .Select(a => new
-                {
-                    id = a.Id,
-                    title = a.Title,
-                    description = a.Description,
-                    category = a.Category,
-                    pointsValue = a.PointsValue,
-                    isDaily = a.IsDaily,
-                    isWeekly = a.IsWeekly,
-                    isOneTime = a.IsOneTime
-                })
-                .ToListAsync();
-
-            return Ok(activities);
+            var activities = await _activitiesService.GetWeeklyActivitiesAsync();
+            var result = activities.Select(a => new
+            {
+                id = a.Id,
+                title = a.Title,
+                description = a.Description,
+                category = a.Category,
+                pointsValue = a.PointsValue,
+                isDaily = a.IsDaily,
+                isWeekly = a.IsWeekly,
+                isOneTime = a.IsOneTime
+            });
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -414,25 +304,19 @@ public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivit
         try
         {
             _logger.LogInformation("Fetching activities in points range: {Min} to {Max}", min, max);
-            
-            var activities = await _context.SustainableActivities
-                .AsNoTracking()
-                .Where(a => a.PointsValue >= min && a.PointsValue <= max)
-                .OrderBy(a => a.PointsValue)
-                .Select(a => new
-                {
-                    id = a.Id,
-                    title = a.Title,
-                    description = a.Description,
-                    category = a.Category,
-                    pointsValue = a.PointsValue,
-                    isDaily = a.IsDaily,
-                    isWeekly = a.IsWeekly,
-                    isOneTime = a.IsOneTime
-                })
-                .ToListAsync();
-
-            return Ok(activities);
+            var activities = await _activitiesService.GetActivitiesByPointsRangeAsync(min, max);
+            var result = activities.Select(a => new
+            {
+                id = a.Id,
+                title = a.Title,
+                description = a.Description,
+                category = a.Category,
+                pointsValue = a.PointsValue,
+                isDaily = a.IsDaily,
+                isWeekly = a.IsWeekly,
+                isOneTime = a.IsOneTime
+            });
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -443,7 +327,6 @@ public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivit
 
     // POST: api/activities/{id}/complete
     [HttpPost("{id}/complete")]
-    [Authorize]
     [RequestSizeLimit(10 * 1024 * 1024)] // Limit to 10MB
     [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
     public async Task<IActionResult> CompleteActivity(int id, [FromForm] ActivityCompletionDto completionData)
@@ -469,14 +352,14 @@ public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivit
             }
 
             // Get the user with a direct query
-            var userQuery = "SELECT id, points, currentstreak, maxstreak, level FROM users WHERE id = @userId";
+            var userQuery = "SELECT id, points, currentstreak, maxstreak, \"Level\" FROM users WHERE id = @userId";
             var userParam = new NpgsqlParameter("userId", completionData.UserId);
             
             var user = await _context.Users
-                .FromSqlRaw(userQuery, userParam)
-                .Select(u => new { u.Id, u.Points, u.CurrentStreak, u.MaxStreak, u.Level })
-                .AsNoTracking()
-                .FirstOrDefaultAsync();
+    .Where(u => u.Id == completionData.UserId)
+    .Select(u => new { u.Id, u.Points, u.CurrentStreak, u.MaxStreak, u.Level })
+    .AsNoTracking()
+    .FirstOrDefaultAsync();
                 
             if (user == null)
             {
@@ -625,28 +508,28 @@ public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivit
             
             // Calculate the new level based on points thresholds
             int newLevel = user.Level;
-            bool leveledUp = false;
+            bool LeveledUp = false;
             
             // Level thresholds
             if (newPoints >= 1000 && user.Level < 4)
             {
                 newLevel = 4;
-                leveledUp = newLevel > user.Level;
+                LeveledUp = newLevel > user.Level;
             }
             else if (newPoints >= 500 && user.Level < 3)
             {
                 newLevel = 3;
-                leveledUp = newLevel > user.Level;
+                LeveledUp = newLevel > user.Level;
             }
             else if (newPoints >= 250 && user.Level < 2)
             {
                 newLevel = 2;
-                leveledUp = newLevel > user.Level;
+                LeveledUp = newLevel > user.Level;
             }
             else if (newPoints >= 100 && user.Level < 1)
             {
                 newLevel = 1;
-                leveledUp = newLevel > user.Level;
+                LeveledUp = newLevel > user.Level;
             }
             
             // Update user stats with direct SQL - now including level
@@ -656,7 +539,7 @@ public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivit
                     currentstreak = @currentStreak, 
                     maxstreak = @maxStreak, 
                     lastactivitydate = @lastActivityDate,
-                    level = @level
+                    ""Level"" = @Level
                 WHERE id = @userId";
                 
             var updateParams = new[]
@@ -665,7 +548,7 @@ public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivit
                 new NpgsqlParameter("currentStreak", newStreak),
                 new NpgsqlParameter("maxStreak", newMaxStreak),
                 new NpgsqlParameter("lastActivityDate", DateTime.UtcNow),
-                new NpgsqlParameter("level", newLevel),
+                new NpgsqlParameter("Level", newLevel),
                 new NpgsqlParameter("userId", completionData.UserId)
             };
             
@@ -699,8 +582,8 @@ public async Task<IActionResult> DeleteActivityFromBody([FromBody] DeleteActivit
                 totalPoints = newPoints,
                 imageUrl = imageUrl,
                 reviewStatus = "Pending Review",
-                level = newLevel,
-                leveledUp = leveledUp,
+                Level = newLevel,
+                LeveledUp = LeveledUp,
                 pointsToNextLevel = pointsToNextLevel
             });
         }
@@ -1123,55 +1006,6 @@ public IActionResult DebugAuth()
         roleClaimType = ClaimTypes.Role,
         customRoleType = "role"
     });
-}
-
-    // DTO for activity completion requests
-    public class ActivityCompletionDto
-    {
-        public int UserId { get; set; }
-        public DateTime? CompletedAt { get; set; }
-
-        // Make notes optional
-        public string? Notes { get; set; } = null;
-
-        // Make image optional
-        public IFormFile? Image { get; set; } = null;
-    }
-
-    // DTO for activity review requests
-    public class ActivityReviewDto
-    {
-        public string Status { get; set; } = "Approved"; // Approved, Rejected, Pending Review
-        public string? AdminNotes { get; set; }
-    }
-
-    public class CreateActivityDto
-    {
-        public string Title { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public int PointsValue { get; set; }
-        public string Category { get; set; } = string.Empty;
-        public bool IsDaily { get; set; }
-        public bool IsWeekly { get; set; }
-        public bool IsOneTime { get; set; }
-        // Only include the properties that exist in your database
-    }
-
-    public class UpdateActivityDto
-    {
-        public int Id { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public string Category { get; set; } = string.Empty;
-        public int PointsValue { get; set; }
-        public bool IsDaily { get; set; }
-        public bool IsWeekly { get; set; }
-        public bool IsOneTime { get; set; }
-    }
-
-public class DeleteActivityDto
-{
-    public int Id { get; set; }
 }
 
     private bool ActivityExists(int id)

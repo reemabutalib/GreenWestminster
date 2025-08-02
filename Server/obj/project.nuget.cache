@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "ByxP13OlbnnR8iXQHrieMUBQr6wOOQap6XRz16yjV/c59zqLLDGiMylxR3Z85l8Y67JY+b6s/9BUZcKVtjILcA==",
+  "dgSpecHash": "FfsaOOl/I8PcwTgfeZiI33Nlp3ovTnBK+BAgURNsROw7rm8L/Cjjcd6pePc8fs9fzxercQ3zlWggIMVV9+dwWA==",
   "success": true,
   "projectFilePath": "/Users/reemabutalib/GreenWestminster/Server/Server.csproj",
   "expectedPackageFiles": [
@@ -103,7 +103,14 @@
     "/Users/reemabutalib/.nuget/packages/system.security.principal.windows/5.0.0/system.security.principal.windows.5.0.0.nupkg.sha512",
     "/Users/reemabutalib/.nuget/packages/system.text.encodings.web/9.0.5/system.text.encodings.web.9.0.5.nupkg.sha512",
     "/Users/reemabutalib/.nuget/packages/system.text.json/9.0.5/system.text.json.9.0.5.nupkg.sha512",
-    "/Users/reemabutalib/.nuget/packages/system.threading.channels/7.0.0/system.threading.channels.7.0.0.nupkg.sha512"
+    "/Users/reemabutalib/.nuget/packages/system.threading.channels/7.0.0/system.threading.channels.7.0.0.nupkg.sha512",
+    "/Users/reemabutalib/.nuget/packages/xunit/2.9.3/xunit.2.9.3.nupkg.sha512",
+    "/Users/reemabutalib/.nuget/packages/xunit.abstractions/2.0.3/xunit.abstractions.2.0.3.nupkg.sha512",
+    "/Users/reemabutalib/.nuget/packages/xunit.analyzers/1.18.0/xunit.analyzers.1.18.0.nupkg.sha512",
+    "/Users/reemabutalib/.nuget/packages/xunit.assert/2.9.3/xunit.assert.2.9.3.nupkg.sha512",
+    "/Users/reemabutalib/.nuget/packages/xunit.core/2.9.3/xunit.core.2.9.3.nupkg.sha512",
+    "/Users/reemabutalib/.nuget/packages/xunit.extensibility.core/2.9.3/xunit.extensibility.core.2.9.3.nupkg.sha512",
+    "/Users/reemabutalib/.nuget/packages/xunit.extensibility.execution/2.9.3/xunit.extensibility.execution.2.9.3.nupkg.sha512"
   ],
   "logs": []
 }

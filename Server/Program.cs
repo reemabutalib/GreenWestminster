@@ -8,6 +8,9 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Server.Models;
 using System.Security.Claims;
+using Server.DTOs;
+using Server.Services.Interfaces;
+using Server.Services.Implementations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +36,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
+
+// Register application services for DI
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IActivitiesService, ActivitiesService>();
+builder.Services.AddScoped<IEventsService, EventsService>();
+builder.Services.AddScoped<IChallengesService, ChallengesService>();
+builder.Services.AddScoped<IRolesService, RolesService>();
 
 // Add CORS configuration
 builder.Services.AddCors(options =>

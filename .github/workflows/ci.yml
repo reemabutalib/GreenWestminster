@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: greenwestminster_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=greenwestminster_test;Username=postgres;Password=postgres"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # Backend (.NET)
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore .NET dependencies
+      run: dotnet restore ./Server
+
+    - name: Build .NET
+      run: dotnet build ./Server --no-restore
+
+    - name: Run .NET tests
+      run: dotnet test ./Server --no-build --logger trx
+
+    # Frontend (React)
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install frontend dependencies
+      run: npm install
+      working-directory: ./Client
+
+    - name: Run frontend tests
+      run: npm test -- --watchAll=false
+      working-directory: ./Client
