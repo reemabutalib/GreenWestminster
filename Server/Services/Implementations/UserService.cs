@@ -1,71 +1,72 @@
-using Server.Data;
 using Server.Models;
-using Microsoft.EntityFrameworkCore;
 using Server.Services.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Server.DTOs;
+using Server.Repositories;
 
 namespace Server.Services.Implementations
 {
     public class UserService : IUserService
-    {
-        private readonly AppDbContext _context;
+    { 
+        private readonly IUserRepository _userRepository;
+        private readonly IActivityCompletionRepository _activityCompletionRepository;
+        private readonly IChallengeRepository _challengeRepository;
+        private readonly SustainableActivityRepository _activityRepository;
 
-        public UserService(AppDbContext context)
+        public UserService(
+            IUserRepository userRepository,
+            IActivityCompletionRepository activityCompletionRepository,
+            IChallengeRepository challengeRepository,
+            SustainableActivityRepository activityRepository)
         {
-            _context = context;
+            _userRepository = userRepository;
+            _activityCompletionRepository = activityCompletionRepository;
+            _challengeRepository = challengeRepository;
+            _activityRepository = activityRepository;
         }
 
         public async Task<IEnumerable<User>> GetUsersAsync()
-        {
-            return await _context.Users.ToListAsync();
-        }
+            => await _userRepository.GetAllAsync();
 
         public async Task<User?> GetUserAsync(int id)
-        {
-            return await _context.Users.FindAsync(id);
-        }
+            => await _userRepository.GetByIdAsync(id);
 
         public async Task<User> CreateUserAsync(User user)
         {
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            await _userRepository.AddAsync(user);
             return user;
         }
 
         public async Task<IEnumerable<User>> GetLeaderboardAsync(string timeFrame)
         {
-            IQueryable<User> query = _context.Users;
+            var users = await _userRepository.GetAllAsync();
 
+            IEnumerable<User> filtered = users;
             if (timeFrame == "week")
             {
                 DateTime oneWeekAgo = DateTime.UtcNow.AddDays(-7);
-                query = query.Where(u => u.LastActivityDate >= oneWeekAgo);
+                filtered = users.Where(u => u.LastActivityDate >= oneWeekAgo);
             }
             else if (timeFrame == "month")
             {
                 DateTime oneMonthAgo = DateTime.UtcNow.AddMonths(-1);
-                query = query.Where(u => u.LastActivityDate >= oneMonthAgo);
+                filtered = users.Where(u => u.LastActivityDate >= oneMonthAgo);
             }
 
-            return await query
+            return filtered
                 .OrderByDescending(u => u.Points)
                 .Take(10)
-                .ToListAsync();
+                .ToList();
         }
 
         public async Task<object?> GetUserStatsAsync(int id)
         {
-            var user = await _context.Users.FindAsync(id);
+            var user = await _userRepository.GetByIdAsync(id);
             if (user == null) return null;
 
-            var completedActivities = await _context.ActivityCompletions
-                .Include(ac => ac.Activity)
-                .Where(ac => ac.UserId == id)
-                .ToListAsync();
+            var completedActivities = await _activityCompletionRepository.GetByUserIdAsync(id);
 
             var treesPlanted = completedActivities.Count(a => a.Activity.Category == "Tree Planting");
             var wasteRecycled = completedActivities.Count(a => a.Activity.Category == "Recycling") * 0.5;
@@ -83,12 +84,9 @@ namespace Server.Services.Implementations
 
         public async Task<IEnumerable<object>> GetRecentActivitiesAsync(int id)
         {
-            var user = await _context.Users.FindAsync(id);
-            if (user == null) return Enumerable.Empty<object>();
+            var activities = await _activityCompletionRepository.GetByUserIdAsync(id);
 
-            return await _context.ActivityCompletions
-                .Include(ac => ac.Activity)
-                .Where(ac => ac.UserId == id)
+            return activities
                 .OrderByDescending(ac => ac.CompletedAt)
                 .Take(10)
                 .Select(ac => new
@@ -103,17 +101,14 @@ namespace Server.Services.Implementations
                         description = ac.Activity.Description
                     }
                 })
-                .ToListAsync();
+                .ToList();
         }
 
         public async Task<IEnumerable<object>> GetCompletedActivitiesAsync(int id, DateTime date)
         {
-            var user = await _context.Users.FindAsync(id);
-            if (user == null) return Enumerable.Empty<object>();
-
-            return await _context.ActivityCompletions
-                .Include(ac => ac.Activity)
-                .Where(ac => ac.UserId == id && ac.CompletedAt.Date == date.Date)
+            var activities = await _activityCompletionRepository.GetByUserIdAsync(id);
+            return activities
+                .Where(ac => ac.CompletedAt.Date == date.Date)
                 .Select(ac => new
                 {
                     id = ac.Id,
@@ -126,41 +121,29 @@ namespace Server.Services.Implementations
                         description = ac.Activity.Description
                     }
                 })
-                .ToListAsync();
+                .ToList();
         }
 
         public async Task<IEnumerable<object>> GetCompletedChallengesAsync(int id)
         {
-            var user = await _context.Users.FindAsync(id);
-            if (user == null) return Enumerable.Empty<object>();
+            var completedChallenges = await _challengeRepository.GetCompletedChallengesByUserIdAsync(id);
 
-            return await _context.UserChallenges
-                .Include(uc => uc.Challenge)
-                .Where(uc => uc.UserId == id && uc.IsCompleted)
-                .Select(uc => new
-                {
-                    id = uc.Challenge.Id,
-                    title = uc.Challenge.Title,
-                    description = uc.Challenge.Description,
-                    category = uc.Challenge.Category,
-                    pointsReward = uc.Challenge.PointsReward,
-                    startDate = uc.Challenge.StartDate,
-                    endDate = uc.Challenge.EndDate,
-                    completedAt = uc.CompletedAt
-                })
-                .ToListAsync();
+            return completedChallenges.Select(uc => new
+            {
+                id = uc.Challenge.Id,
+                title = uc.Challenge.Title,
+                description = uc.Challenge.Description,
+                category = uc.Challenge.Category,
+                pointsReward = uc.Challenge.PointsReward,
+                startDate = uc.Challenge.StartDate,
+                endDate = uc.Challenge.EndDate,
+                completedAt = uc.CompletedAt
+            });
         }
 
         public async Task<object?> GetChallengeStatusAsync(int userId, int challengeId)
         {
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null) return null;
-
-            var challenge = await _context.Challenges.FindAsync(challengeId);
-            if (challenge == null) return null;
-
-            var userChallenge = await _context.UserChallenges
-                .FirstOrDefaultAsync(uc => uc.UserId == userId && uc.ChallengeId == challengeId);
+            var userChallenge = await _challengeRepository.GetUserChallengeAsync(userId, challengeId);
 
             return new
             {
@@ -172,18 +155,17 @@ namespace Server.Services.Implementations
 
         public async Task<ActivityCompletion?> CompleteActivityAsync(int userId, int activityId)
         {
-            var user = await _context.Users.FindAsync(userId);
+            // This logic may need to be moved to a domain service or the repository if you want to keep UserService thin.
+            var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) return null;
 
-            var activity = await _context.SustainableActivities.FindAsync(activityId);
+            var activity = await _activityRepository.GetByIdAsync(activityId);
             if (activity == null) return null;
 
             if (activity.IsDaily)
             {
-                var todayCompletion = await _context.ActivityCompletions
-                    .Where(ac => ac.UserId == userId && ac.ActivityId == activityId &&
-                            ac.CompletedAt.Date == DateTime.UtcNow.Date)
-                    .FirstOrDefaultAsync();
+                var todayCompletion = (await _activityCompletionRepository.GetByUserIdAsync(userId))
+                    .FirstOrDefault(ac => ac.ActivityId == activityId && ac.CompletedAt.Date == DateTime.UtcNow.Date);
 
                 if (todayCompletion != null)
                     return null;
@@ -213,27 +195,24 @@ namespace Server.Services.Implementations
 
             user.LastActivityDate = DateTime.UtcNow;
 
-            _context.ActivityCompletions.Add(completion);
-            await _context.SaveChangesAsync();
+            await _activityCompletionRepository.AddAsync(completion);
+            await _userRepository.UpdateAsync(user);
 
             return completion;
         }
 
         public async Task<object?> GetActivityStatsAsync(int userId)
         {
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null) return null;
+            var activities = await _activityCompletionRepository.GetByUserIdAsync(userId);
 
-            var categoryCounts = await _context.ActivityCompletions
-                .Include(ac => ac.Activity)
-                .Where(ac => ac.UserId == userId)
+            var categoryCounts = activities
                 .GroupBy(ac => ac.Activity.Category)
                 .Select(g => new
                 {
                     name = g.Key,
                     value = g.Count()
                 })
-                .ToListAsync();
+                .ToList();
 
             var fourWeeksAgo = DateTime.UtcNow.AddDays(-28);
 
@@ -243,15 +222,15 @@ namespace Server.Services.Implementations
                 { 4, "Thu" }, { 5, "Fri" }, { 6, "Sat" }, { 0, "Sun" }
             };
 
-            var weeklyActivity = await _context.ActivityCompletions
-                .Where(ac => ac.UserId == userId && ac.CompletedAt >= fourWeeksAgo)
+            var weeklyActivity = activities
+                .Where(ac => ac.CompletedAt >= fourWeeksAgo)
                 .GroupBy(ac => ((int)ac.CompletedAt.DayOfWeek))
                 .Select(g => new
                 {
                     dayNum = g.Key,
                     count = g.Count()
                 })
-                .ToListAsync();
+                .ToList();
 
             var formattedWeeklyActivity = Enumerable.Range(0, 7)
                 .Select(dayNum => new
@@ -276,8 +255,7 @@ namespace Server.Services.Implementations
 
         public async Task<IEnumerable<object>> GetPointsHistoryAsync(int userId)
         {
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null) return Enumerable.Empty<object>();
+            var activities = await _activityCompletionRepository.GetByUserIdAsync(userId);
 
             var fourWeeksAgo = DateTime.UtcNow.AddDays(-28).Date;
 
@@ -287,18 +265,15 @@ namespace Server.Services.Implementations
                     i => $"Week {4 - i}"
                 );
 
-            var pointsHistory = await _context.ActivityCompletions
-                .Where(ac => ac.UserId == userId && ac.CompletedAt >= fourWeeksAgo)
-                .GroupBy(ac => new
-                {
-                    WeekStart = ac.CompletedAt.Date.AddDays(-(int)ac.CompletedAt.DayOfWeek).Date
-                })
+            var pointsHistory = activities
+                .Where(ac => ac.CompletedAt >= fourWeeksAgo)
+                .GroupBy(ac => ac.CompletedAt.Date.AddDays(-(int)ac.CompletedAt.DayOfWeek).Date)
                 .Select(g => new
                 {
-                    WeekStart = g.Key.WeekStart,
+                    WeekStart = g.Key,
                     Points = g.Sum(ac => ac.PointsEarned)
                 })
-                .ToListAsync();
+                .ToList();
 
             var formattedPointsHistory = weekLookup.Keys
                 .OrderBy(date => date)
@@ -316,14 +291,14 @@ namespace Server.Services.Implementations
 
         public async Task<object> AddPointsAsync(int userId, int points)
         {
-            var user = await _context.Users.FindAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) return new { success = false, message = "User not found" };
 
             int oldLevel = user.Level;
             user.Points += points;
             user.Level = LevelingService.CalculateLevel(user.Points);
 
-            await _context.SaveChangesAsync();
+            await _userRepository.UpdateAsync(user);
 
             bool leveledUp = user.Level > oldLevel;
 
@@ -353,7 +328,7 @@ namespace Server.Services.Implementations
 
         public async Task<object?> GetLevelInfoAsync(int userId)
         {
-            var user = await _context.Users.FindAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) return null;
 
             int currentLevel = LevelingService.CalculateLevel(user.Points);

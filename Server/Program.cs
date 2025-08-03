@@ -4,13 +4,13 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Server.Models;
 using System.Security.Claims;
 using Server.DTOs;
 using Server.Services.Interfaces;
 using Server.Services.Implementations;
+using Server.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +45,13 @@ builder.Services.AddScoped<IActivitiesService, ActivitiesService>();
 builder.Services.AddScoped<IEventsService, EventsService>();
 builder.Services.AddScoped<IChallengesService, ChallengesService>();
 builder.Services.AddScoped<IRolesService, RolesService>();
+
+// Register repositories for DI
+builder.Services.AddScoped<ActivityCompletionRepository>();
+builder.Services.AddScoped<ChallengeRepository>();
+builder.Services.AddScoped<SustainableEventRepository>();
+builder.Services.AddScoped<UserRepository>();
+builder.Services.AddScoped<SustainableActivityRepository>();
 
 // Add CORS configuration
 builder.Services.AddCors(options =>

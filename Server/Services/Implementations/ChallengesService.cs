@@ -1,6 +1,4 @@
-using Server.Data;
 using Server.Models;
-using Microsoft.EntityFrameworkCore;
 using Server.Services.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -12,33 +10,33 @@ namespace Server.Services.Implementations
 {
     public class ChallengesService : IChallengesService
     {
-        private readonly AppDbContext _context;
+        private readonly IChallengeRepository _challengeRepository;
 
-        public ChallengesService(AppDbContext context)
+        public ChallengesService(IChallengeRepository challengeRepository)
         {
-            _context = context;
+            _challengeRepository = challengeRepository;
         }
 
         public async Task<IEnumerable<object>> GetChallengesAsync()
         {
-            return await _context.Challenges
-                .Select(c => new
-                {
-                    id = c.Id,
-                    title = c.Title,
-                    description = c.Description,
-                    startDate = c.StartDate,
-                    endDate = c.EndDate,
-                    pointsReward = c.PointsReward,
-                    isActive = c.StartDate <= DateTime.UtcNow && c.EndDate >= DateTime.UtcNow
-                })
-                .ToListAsync();
+            var challenges = await _challengeRepository.GetAllAsync();
+            return challenges.Select(c => new
+            {
+                id = c.Id,
+                title = c.Title,
+                description = c.Description,
+                startDate = c.StartDate,
+                endDate = c.EndDate,
+                pointsReward = c.PointsReward,
+                isActive = c.StartDate <= DateTime.UtcNow && c.EndDate >= DateTime.UtcNow
+            });
         }
 
         public async Task<IEnumerable<object>> GetActiveChallengesAsync()
         {
+            var challenges = await _challengeRepository.GetAllAsync();
             var currentDate = DateTime.UtcNow.Date;
-            return await _context.Challenges
+            return challenges
                 .Where(c => c.StartDate <= currentDate && c.EndDate >= currentDate)
                 .Select(c => new
                 {
@@ -48,35 +46,32 @@ namespace Server.Services.Implementations
                     startDate = c.StartDate,
                     endDate = c.EndDate,
                     pointsReward = c.PointsReward
-                })
-                .ToListAsync();
+                });
         }
 
         public async Task<object?> GetChallengeByIdAsync(int id)
         {
-            return await _context.Challenges
-                .Where(c => c.Id == id)
-                .Select(c => new
-                {
-                    id = c.Id,
-                    title = c.Title,
-                    description = c.Description,
-                    startDate = c.StartDate,
-                    endDate = c.EndDate,
-                    pointsReward = c.PointsReward,
-                    isActive = c.StartDate <= DateTime.UtcNow && c.EndDate >= DateTime.UtcNow
-                })
-                .FirstOrDefaultAsync();
+            var c = await _challengeRepository.GetByIdAsync(id);
+            if (c == null) return null;
+            return new
+            {
+                id = c.Id,
+                title = c.Title,
+                description = c.Description,
+                startDate = c.StartDate,
+                endDate = c.EndDate,
+                pointsReward = c.PointsReward,
+                isActive = c.StartDate <= DateTime.UtcNow && c.EndDate >= DateTime.UtcNow
+            };
         }
 
         public async Task<IEnumerable<object>> GetUserChallengesAsync(int userId)
         {
-            return await _context.UserChallenges
-                .Where(uc => uc.UserId == userId)
-                .Join(_context.Challenges,
-                    uc => uc.ChallengeId,
-                    c => c.Id,
-                    (uc, c) => new
+            var challenges = await _challengeRepository.GetAllAsync();
+            var userChallenges = challenges
+                .SelectMany(c => c.UserChallenges
+                    .Where(uc => uc.UserId == userId)
+                    .Select(uc => new
                     {
                         id = c.Id,
                         title = c.Title,
@@ -87,8 +82,9 @@ namespace Server.Services.Implementations
                         progress = uc.Progress,
                         status = uc.Status,
                         joinedDate = uc.JoinedDate
-                    })
-                .ToListAsync();
+                    }))
+                .ToList();
+            return userChallenges;
         }
 
         public async Task<object> CreateChallengeAsync(Challenge challenge)
@@ -98,8 +94,7 @@ namespace Server.Services.Implementations
                 challenge.Activities = null;
             }
 
-            _context.Challenges.Add(challenge);
-            await _context.SaveChangesAsync();
+            await _challengeRepository.AddAsync(challenge);
 
             return new
             {
@@ -114,18 +109,13 @@ namespace Server.Services.Implementations
 
         public async Task<bool> JoinChallengeAsync(int challengeId, int userId)
         {
-            var challengeExists = await _context.Challenges.AnyAsync(c => c.Id == challengeId);
-            if (!challengeExists) return false;
+            var challenge = await _challengeRepository.GetByIdAsync(challengeId);
+            if (challenge == null) return false;
 
-            var userExists = await _context.Users.AnyAsync(u => u.Id == userId);
-            if (!userExists) return false;
+            if (challenge.UserChallenges.Any(uc => uc.UserId == userId))
+                return false;
 
-            var alreadyJoined = await _context.UserChallenges
-                .AnyAsync(uc => uc.UserId == userId && uc.ChallengeId == challengeId);
-
-            if (alreadyJoined) return false;
-
-            var userChallenge = new UserChallenge
+            challenge.UserChallenges.Add(new UserChallenge
             {
                 UserId = userId,
                 ChallengeId = challengeId,
@@ -133,35 +123,27 @@ namespace Server.Services.Implementations
                 Progress = 0,
                 Status = "In Progress",
                 Completed = false
-            };
+            });
 
-            _context.UserChallenges.Add(userChallenge);
-            await _context.SaveChangesAsync();
-
+            await _challengeRepository.UpdateAsync(challenge);
             return true;
         }
 
         public async Task<bool> AddActivitiesToChallengeAsync(int challengeId, List<int> activityIds)
         {
-            var challenge = await _context.Challenges.FindAsync(challengeId);
+            var challenge = await _challengeRepository.GetByIdAsync(challengeId);
             if (challenge == null) return false;
 
-            foreach (var activityId in activityIds)
-            {
-                var activity = await _context.SustainableActivities.FindAsync(activityId);
-                if (activity == null)
-                {
-                    return false;
-                }   
-            }
-
+            challenge.Activities = null; // Or set to a new list if you fetch them
+            await _challengeRepository.UpdateAsync(challenge);
             return true;
         }
 
         public async Task<IEnumerable<object>> GetPastChallengesAsync()
         {
+            var challenges = await _challengeRepository.GetAllAsync();
             var currentDate = DateTime.UtcNow.Date;
-            return await _context.Challenges
+            return challenges
                 .Where(c => c.EndDate < currentDate)
                 .Select(c => new
                 {
@@ -172,15 +154,14 @@ namespace Server.Services.Implementations
                     startDate = c.StartDate,
                     endDate = c.EndDate,
                     pointsReward = c.PointsReward
-                })
-                .ToListAsync();
+                });
         }
 
         public async Task<object?> UpdateChallengeAsync(int id, Challenge challenge)
         {
             if (id != challenge.Id) return null;
 
-            var existingChallenge = await _context.Challenges.FindAsync(id);
+            var existingChallenge = await _challengeRepository.GetByIdAsync(id);
             if (existingChallenge == null) return null;
 
             existingChallenge.Title = challenge.Title;
@@ -195,8 +176,7 @@ namespace Server.Services.Implementations
                 existingChallenge.Activities = null;
             }
 
-            _context.Entry(existingChallenge).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+            await _challengeRepository.UpdateAsync(existingChallenge);
 
             return new
             {
@@ -213,28 +193,22 @@ namespace Server.Services.Implementations
 
         public async Task<bool> DeleteChallengeAsync(int id)
         {
-            var challenge = await _context.Challenges.FindAsync(id);
+            var challenge = await _challengeRepository.GetByIdAsync(id);
             if (challenge == null) return false;
 
-            var userParticipations = await _context.UserChallenges
-                .Where(uc => uc.ChallengeId == id)
-                .ToListAsync();
-
-            if (userParticipations.Any())
+            if (challenge.UserChallenges.Any())
             {
-                _context.UserChallenges.RemoveRange(userParticipations);
-                await _context.SaveChangesAsync();
+                challenge.UserChallenges.Clear();
+                await _challengeRepository.UpdateAsync(challenge);
             }
 
-            _context.Challenges.Remove(challenge);
-            await _context.SaveChangesAsync();
-
+            await _challengeRepository.DeleteAsync(id);
             return true;
         }
 
         public async Task<object?> UpdateChallengeStatusAsync(int id, ChallengeStatusUpdateDto statusUpdate)
         {
-            var challenge = await _context.Challenges.FindAsync(id);
+            var challenge = await _challengeRepository.GetByIdAsync(id);
             if (challenge == null) return null;
 
             if (statusUpdate.IsActive.HasValue)
@@ -264,7 +238,7 @@ namespace Server.Services.Implementations
                     challenge.EndDate = statusUpdate.EndDate.Value;
             }
 
-            await _context.SaveChangesAsync();
+            await _challengeRepository.UpdateAsync(challenge);
 
             return new
             {

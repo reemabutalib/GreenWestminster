@@ -1,23 +1,33 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Server.Data;
 using Server.Models;
 using Server.Services.Interfaces;
-using Server.DTOs;
+using Server.Repositories;
+using System.Collections.Generic;
 
 namespace Server.Services.Implementations
 {
     public class AdminService : IAdminService
     {
-        private readonly AppDbContext _context;
+        private readonly UserRepository _userRepository;
+        private readonly ActivityCompletionRepository _activityCompletionRepository;
+        private readonly ChallengeRepository _challengeRepository;
+        private readonly SustainableEventRepository _eventRepository;
         private readonly ILogger<AdminService> _logger;
 
-        public AdminService(AppDbContext context, ILogger<AdminService> logger)
+        public AdminService(
+            UserRepository userRepository,
+            ActivityCompletionRepository activityCompletionRepository,
+            ChallengeRepository challengeRepository,
+            SustainableEventRepository eventRepository,
+            ILogger<AdminService> logger)
         {
-            _context = context;
+            _userRepository = userRepository;
+            _activityCompletionRepository = activityCompletionRepository;
+            _challengeRepository = challengeRepository;
+            _eventRepository = eventRepository;
             _logger = logger;
         }
 
@@ -25,11 +35,12 @@ namespace Server.Services.Implementations
         {
             _logger.LogInformation("AdminService: Fetching user engagement statistics");
 
-            int totalUsers = await _context.Users.CountAsync();
-            int activeUsersLast7Days = await _context.Users.CountAsync(u => u.LastActivityDate >= DateTime.UtcNow.AddDays(-7));
-            int activeUsersLast30Days = await _context.Users.CountAsync(u => u.LastActivityDate >= DateTime.UtcNow.AddDays(-30));
+            var users = await _userRepository.GetAllAsync();
+            int totalUsers = users.Count;
+            int activeUsersLast7Days = users.Count(u => u.LastActivityDate >= DateTime.UtcNow.AddDays(-7));
+            int activeUsersLast30Days = users.Count(u => u.LastActivityDate >= DateTime.UtcNow.AddDays(-30));
 
-            var topUsers = await _context.Users
+            var topUsers = users
                 .OrderByDescending(u => u.Points)
                 .Take(10)
                 .Select(u => new
@@ -41,12 +52,12 @@ namespace Server.Services.Implementations
                     maxStreak = u.MaxStreak,
                     joinDate = u.JoinDate
                 })
-                .ToListAsync();
+                .ToList();
 
-            int totalActivities = await _context.SustainableActivities.CountAsync();
-            int totalCompletions = await _context.ActivityCompletions.CountAsync();
+            var activities = await _activityCompletionRepository.GetAllAsync();
+            int totalCompletions = activities.Count;
 
-            var popularActivities = await _context.ActivityCompletions
+            var activityGroups = activities
                 .GroupBy(ac => ac.ActivityId)
                 .Select(g => new
                 {
@@ -55,48 +66,40 @@ namespace Server.Services.Implementations
                 })
                 .OrderByDescending(a => a.completionCount)
                 .Take(5)
-                .ToListAsync();
+                .ToList();
 
-            var activityIds = popularActivities.Select(a => a.activityId).ToList();
-            var activityDetails = await _context.SustainableActivities
+            // Get activity details for popular activities
+            var activityIds = activityGroups.Select(a => a.activityId).ToList();
+            var allActivities = await Task.FromResult(activities.Select(ac => ac.Activity).Distinct().ToList());
+            var activityDetails = allActivities
                 .Where(a => activityIds.Contains(a.Id))
-                .Select(a => new
-                {
-                    id = a.Id,
-                    title = a.Title,
-                    category = a.Category
-                })
-                .ToDictionaryAsync(a => a.id, a => new { a.title, a.category });
+                .ToDictionary(a => a.Id, a => new { a.Title, a.Category });
 
-            var popularActivitiesWithDetails = popularActivities
+            var popularActivitiesWithDetails = activityGroups
                 .Select(a => new
                 {
                     activityId = a.activityId,
-                    title = activityDetails.ContainsKey(a.activityId) ? activityDetails[a.activityId].title : "Unknown Activity",
-                    category = activityDetails.ContainsKey(a.activityId) ? activityDetails[a.activityId].category : "Unknown",
+                    title = activityDetails.ContainsKey(a.activityId) ? activityDetails[a.activityId].Title : "Unknown Activity",
+                    category = activityDetails.ContainsKey(a.activityId) ? activityDetails[a.activityId].Category : "Unknown",
                     completionCount = a.completionCount
                 })
                 .ToList();
 
-            int totalEvents = await _context.SustainabilityEvents.CountAsync();
-            int upcomingEvents = await _context.SustainabilityEvents.CountAsync(e => e.StartDate > DateTime.UtcNow);
+            var sustainableActivities = allActivities;
+            int totalActivities = sustainableActivities.Count;
 
-            var pointsDistributionQuery = await _context.Users
+            var events = await _eventRepository.GetAllAsync();
+            int totalEvents = events.Count;
+            int upcomingEvents = events.Count(e => e.StartDate > DateTime.UtcNow);
+
+            var pointsDistribution = users
                 .GroupBy(u => u.Points / 100)
                 .Select(g => new
                 {
-                    pointRange = g.Key,
+                    pointRange = $"{g.Key * 100}-{(g.Key + 1) * 100 - 1}",
                     userCount = g.Count()
                 })
                 .OrderBy(g => g.pointRange)
-                .ToListAsync();
-
-            var pointsDistribution = pointsDistributionQuery
-                .Select(g => new
-                {
-                    pointRange = $"{g.pointRange * 100}-{(g.pointRange + 1) * 100 - 1}",
-                    userCount = g.userCount
-                })
                 .ToList();
 
             return new
@@ -118,31 +121,27 @@ namespace Server.Services.Implementations
         {
             _logger.LogInformation("AdminService: Fetching activity completions");
 
-            var query = _context.ActivityCompletions.AsQueryable();
+            var completions = await _activityCompletionRepository.GetAllAsync();
 
             if (startDate.HasValue)
-            {
-                query = query.Where(ac => ac.CompletedAt >= startDate.Value); // Changed property name
-            }
+                completions = completions.Where(ac => ac.CompletedAt >= startDate.Value).ToList();
 
             if (endDate.HasValue)
-            {
-                query = query.Where(ac => ac.CompletedAt <= endDate.Value); // Changed property name
-            }
+                completions = completions.Where(ac => ac.CompletedAt <= endDate.Value).ToList();
 
-            var completions = await query
+            var grouped = completions
                 .GroupBy(ac => ac.ActivityId)
                 .Select(g => new
                 {
                     activityId = g.Key,
                     completionCount = g.Count()
                 })
-                .ToListAsync();
+                .ToList();
 
             return new
             {
-                totalCompletions = completions.Sum(c => c.completionCount),
-                activityCompletions = completions
+                totalCompletions = grouped.Sum(c => c.completionCount),
+                activityCompletions = grouped
             };
         }
     }

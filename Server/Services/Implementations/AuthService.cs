@@ -14,23 +14,24 @@ using System.Linq;
 using Server.Services.Interfaces;
 using BC = BCrypt.Net.BCrypt;
 using Server.DTOs;
+using Server.Repositories;
 
 namespace Server.Services.Implementations
 {
     public class AuthService : IAuthService
     {
-        private readonly AppDbContext _context;
+        private readonly UserRepository _userRepository;
         private readonly IConfiguration _configuration;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly UserManager<IdentityUser> _userManager;
 
         public AuthService(
-            AppDbContext context,
+            UserRepository userRepository,
             IConfiguration configuration,
             RoleManager<IdentityRole> roleManager,
             UserManager<IdentityUser> userManager)
         {
-            _context = context;
+            _userRepository = userRepository;
             _configuration = configuration;
             _roleManager = roleManager;
             _userManager = userManager;
@@ -38,10 +39,12 @@ namespace Server.Services.Implementations
 
         public async Task<(bool Success, string Message, int? UserId, string? Username)> RegisterAsync(RegisterDto registerDto)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == registerDto.Email))
+            if (await _userRepository.GetByEmailAsync(registerDto.Email) != null)
                 return (false, "Email is already registered", null, null);
 
-            if (await _context.Users.AnyAsync(u => u.Username == registerDto.Username))
+            var existingUserByUsername = (await _userRepository.GetAllAsync())
+                .FirstOrDefault(u => u.Username == registerDto.Username);
+            if (existingUserByUsername != null)
                 return (false, "Username is already taken", null, null);
 
             var user = new User
@@ -56,8 +59,7 @@ namespace Server.Services.Implementations
                 LastActivityDate = DateTime.UtcNow
             };
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            await _userRepository.AddAsync(user);
 
             if (_userManager != null)
             {
@@ -76,7 +78,7 @@ namespace Server.Services.Implementations
 
         public async Task<(bool Success, string Message, string? Token, int? UserId, string? Username, string? Email, IList<string>? Roles)> LoginAsync(LoginDto loginDto)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == loginDto.Email);
+            var user = await _userRepository.GetByEmailAsync(loginDto.Email);
             if (user == null)
                 return (false, "Invalid email or password", null, null, null, null, null);
 
@@ -90,7 +92,7 @@ namespace Server.Services.Implementations
                 if (loginDto.Password == user.Password)
                 {
                     user.Password = BC.HashPassword(loginDto.Password);
-                    await _context.SaveChangesAsync();
+                    await _userRepository.UpdateAsync(user);
                     validPassword = true;
                 }
             }
@@ -106,7 +108,7 @@ namespace Server.Services.Implementations
 
         public async Task<object?> GetUserInfoAsync(int userId)
         {
-            var user = await _context.Users.FindAsync(userId);
+            var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) return null;
             var roles = await GetUserRolesAsync(user.Email);
 

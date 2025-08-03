@@ -93,10 +93,6 @@
             "System.IdentityModel.Tokens.Jwt": {
               "target": "Package",
               "version": "[8.12.1, )"
-            },
-            "xunit": {
-              "target": "Package",
-              "version": "[2.9.3, )"
             }
           },
           "imports": [

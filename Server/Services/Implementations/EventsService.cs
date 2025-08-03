@@ -1,6 +1,4 @@
-using Server.Data;
 using Server.Models;
-using Microsoft.EntityFrameworkCore;
 using Server.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using System;
@@ -9,22 +7,24 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Server.DTOs;
+using Server.Repositories;
 
 namespace Server.Services.Implementations
 {
     public class EventsService : IEventsService
     {
-        private readonly AppDbContext _context;
+        private readonly SustainableEventRepository _eventRepository;
 
-        public EventsService(AppDbContext context)
+        public EventsService(SustainableEventRepository eventRepository)
         {
-            _context = context;
+            _eventRepository = eventRepository;
         }
 
         public async Task<IEnumerable<object>> GetEventsAsync()
         {
-            return await _context.SustainabilityEvents
-                .AsNoTracking()
+            var events = await _eventRepository.GetAllAsync();
+            return events
+                .OrderBy(e => e.StartDate)
                 .Select(e => new
                 {
                     id = e.Id,
@@ -41,42 +41,39 @@ namespace Server.Services.Implementations
                     isVirtual = e.IsVirtual,
                     createdAt = e.CreatedAt,
                     updatedAt = e.UpdatedAt
-                })
-                .OrderBy(e => e.startDate)
-                .ToListAsync();
+                });
         }
 
         public async Task<object?> GetEventByIdAsync(int id)
         {
-            return await _context.SustainabilityEvents
-                .AsNoTracking()
-                .Where(e => e.Id == id)
-                .Select(e => new
-                {
-                    id = e.Id,
-                    title = e.Title,
-                    description = e.Description,
-                    location = e.Location,
-                    startDate = e.StartDate,
-                    endDate = e.EndDate,
-                    registrationLink = e.RegistrationLink,
-                    imageUrl = e.ImageUrl,
-                    organizer = e.Organizer,
-                    maxAttendees = e.MaxAttendees,
-                    category = e.Category,
-                    isVirtual = e.IsVirtual,
-                    createdAt = e.CreatedAt,
-                    updatedAt = e.UpdatedAt
-                })
-                .FirstOrDefaultAsync();
+            var e = await _eventRepository.GetByIdAsync(id);
+            if (e == null) return null;
+            return new
+            {
+                id = e.Id,
+                title = e.Title,
+                description = e.Description,
+                location = e.Location,
+                startDate = e.StartDate,
+                endDate = e.EndDate,
+                registrationLink = e.RegistrationLink,
+                imageUrl = e.ImageUrl,
+                organizer = e.Organizer,
+                maxAttendees = e.MaxAttendees,
+                category = e.Category,
+                isVirtual = e.IsVirtual,
+                createdAt = e.CreatedAt,
+                updatedAt = e.UpdatedAt
+            };
         }
 
         public async Task<IEnumerable<object>> GetUpcomingEventsAsync()
         {
             var today = DateTime.UtcNow;
-            return await _context.SustainabilityEvents
-                .AsNoTracking()
+            var events = await _eventRepository.GetAllAsync();
+            return events
                 .Where(e => e.StartDate > today)
+                .OrderBy(e => e.StartDate)
                 .Select(e => new
                 {
                     id = e.Id,
@@ -91,14 +88,11 @@ namespace Server.Services.Implementations
                     maxAttendees = e.MaxAttendees,
                     category = e.Category,
                     isVirtual = e.IsVirtual
-                })
-                .OrderBy(e => e.startDate)
-                .ToListAsync();
+                });
         }
 
         public async Task<object> CreateEventAsync(object eventDto, Func<IFormFile?, Task<string?>> imageHandler, string requestScheme, string requestHost)
         {
-            // eventDto should be cast to the correct DTO type in the controller before calling this method
             dynamic dto = eventDto;
             string? imageUrl = await imageHandler(dto.Image);
 
@@ -119,8 +113,7 @@ namespace Server.Services.Implementations
                 UpdatedAt = DateTime.UtcNow
             };
 
-            _context.SustainabilityEvents.Add(newEvent);
-            await _context.SaveChangesAsync();
+            await _eventRepository.AddAsync(newEvent);
 
             return new
             {
@@ -144,7 +137,7 @@ namespace Server.Services.Implementations
         public async Task<object?> UpdateEventAsync(int id, object eventDto, Func<IFormFile?, string?, Task<string?>> imageHandler, string requestScheme, string requestHost)
         {
             dynamic dto = eventDto;
-            var existingEvent = await _context.SustainabilityEvents.FindAsync(id);
+            var existingEvent = await _eventRepository.GetByIdAsync(id);
             if (existingEvent == null) return null;
 
             string? imageUrl = existingEvent.ImageUrl;
@@ -166,7 +159,7 @@ namespace Server.Services.Implementations
             existingEvent.IsVirtual = dto.IsVirtual;
             existingEvent.UpdatedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
+            await _eventRepository.UpdateAsync(existingEvent);
 
             return new
             {
@@ -188,22 +181,22 @@ namespace Server.Services.Implementations
 
         public async Task<bool> DeleteEventAsync(int id, Func<string?, Task> imageDeleter)
         {
-            var existingEvent = await _context.SustainabilityEvents.FindAsync(id);
+            var existingEvent = await _eventRepository.GetByIdAsync(id);
             if (existingEvent == null) return false;
 
             await imageDeleter(existingEvent.ImageUrl);
 
-            _context.SustainabilityEvents.Remove(existingEvent);
-            await _context.SaveChangesAsync();
+            await _eventRepository.DeleteAsync(id);
 
             return true;
         }
 
         public async Task<IEnumerable<object>> GetEventsByCategoryAsync(string category)
         {
-            return await _context.SustainabilityEvents
-                .AsNoTracking()
-                .Where(e => EF.Functions.ILike(e.Category, $"%{category}%"))
+            var events = await _eventRepository.GetAllAsync();
+            return events
+                .Where(e => e.Category != null && e.Category.Contains(category, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(e => e.StartDate)
                 .Select(e => new
                 {
                     id = e.Id,
@@ -218,9 +211,7 @@ namespace Server.Services.Implementations
                     maxAttendees = e.MaxAttendees,
                     category = e.Category,
                     isVirtual = e.IsVirtual
-                })
-                .OrderBy(e => e.startDate)
-                .ToListAsync();
+                });
         }
     }
 }
