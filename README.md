@@ -1,6 +1,6 @@
 # Green Westminster
 
-Green Westminster is a full-stack web application designed to help students and staff at Westminster University track, improve, and celebrate their sustainability efforts on campus.
+Green Westminster is a full-stack web application designed to help students at the University of Westminster track, improve, and celebrate their sustainability efforts on campus.
 
 ---
 
