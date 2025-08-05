@@ -5,21 +5,22 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Server.Repositories;
+using Server.Repositories.Interfaces;
 
 namespace Server.Services.Implementations
 {
     public class UserService : IUserService
-    { 
+    {
         private readonly IUserRepository _userRepository;
         private readonly IActivityCompletionRepository _activityCompletionRepository;
         private readonly IChallengeRepository _challengeRepository;
-        private readonly SustainableActivityRepository _activityRepository;
+        private readonly ISustainableActivityRepository _activityRepository;
 
         public UserService(
-            IUserRepository userRepository,
-            IActivityCompletionRepository activityCompletionRepository,
-            IChallengeRepository challengeRepository,
-            SustainableActivityRepository activityRepository)
+     IUserRepository userRepository,
+     IActivityCompletionRepository activityCompletionRepository,
+     IChallengeRepository challengeRepository,
+     ISustainableActivityRepository activityRepository) // <-- use interface
         {
             _userRepository = userRepository;
             _activityCompletionRepository = activityCompletionRepository;
@@ -361,5 +362,14 @@ namespace Server.Services.Implementations
                 }
             };
         }
+
+        public async Task<bool> UpdateAvatarAsync(int userId, string avatarStyle)
+{
+    var user = await _userRepository.GetByIdAsync(userId);
+    if (user == null) return false;
+    user.AvatarStyle = avatarStyle;
+    await _userRepository.UpdateAsync(user);
+    return true;
+}
     }
 }

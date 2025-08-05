@@ -14,5 +14,8 @@ namespace Server.DTOs
 
         // Make image optional
         public IFormFile? Image { get; set; } = null;
+
+        public double? Quantity { get; set; }
+
     }
 }

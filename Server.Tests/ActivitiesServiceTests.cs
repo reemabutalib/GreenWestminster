@@ -5,6 +5,7 @@ using Server.Services.Interfaces;
 using Server.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Server.Repositories.Interfaces;
 
 public class ActivitiesServiceTests
 {

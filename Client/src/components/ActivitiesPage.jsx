@@ -58,7 +58,7 @@ const ActivitiesPage = () => {
         }
         
         const activitiesData = await response.json();
-        setActivities(activitiesData);
+        setActivities(Array.isArray(activitiesData) ? activitiesData : []);
         
         // Extract unique categories
         const uniqueCategories = [...new Set(activitiesData.map(activity => activity.category))];

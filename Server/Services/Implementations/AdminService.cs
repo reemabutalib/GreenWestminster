@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Server.Models;
+using Server.Repositories.Interfaces;
 using Server.Services.Interfaces;
 using Server.Repositories;
 using System.Collections.Generic;
@@ -11,17 +12,17 @@ namespace Server.Services.Implementations
 {
     public class AdminService : IAdminService
     {
-        private readonly UserRepository _userRepository;
-        private readonly ActivityCompletionRepository _activityCompletionRepository;
-        private readonly ChallengeRepository _challengeRepository;
-        private readonly SustainableEventRepository _eventRepository;
+        private readonly IUserRepository _userRepository;
+        private readonly IActivityCompletionRepository _activityCompletionRepository;
+        private readonly IChallengeRepository _challengeRepository;
+        private readonly ISustainableEventRepository _eventRepository;
         private readonly ILogger<AdminService> _logger;
 
         public AdminService(
-            UserRepository userRepository,
-            ActivityCompletionRepository activityCompletionRepository,
-            ChallengeRepository challengeRepository,
-            SustainableEventRepository eventRepository,
+            IUserRepository userRepository,
+            IActivityCompletionRepository activityCompletionRepository,
+            IChallengeRepository challengeRepository,
+            ISustainableEventRepository eventRepository,
             ILogger<AdminService> logger)
         {
             _userRepository = userRepository;

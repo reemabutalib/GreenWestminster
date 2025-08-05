@@ -14,19 +14,19 @@ using System.Linq;
 using Server.Services.Interfaces;
 using BC = BCrypt.Net.BCrypt;
 using Server.DTOs;
-using Server.Repositories;
+using Server.Repositories.Interfaces;
 
 namespace Server.Services.Implementations
 {
     public class AuthService : IAuthService
     {
-        private readonly UserRepository _userRepository;
+        private readonly IUserRepository _userRepository;
         private readonly IConfiguration _configuration;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly UserManager<IdentityUser> _userManager;
 
         public AuthService(
-            UserRepository userRepository,
+            IUserRepository userRepository,
             IConfiguration configuration,
             RoleManager<IdentityRole> roleManager,
             UserManager<IdentityUser> userManager)

@@ -247,6 +247,9 @@ namespace Server.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("pointsearned");
 
+                    b.Property<double?>("Quantity")
+                        .HasColumnType("double precision");
+
                     b.Property<string>("ReviewStatus")
                         .IsRequired()
                         .HasColumnType("text");
@@ -392,9 +395,6 @@ namespace Server.Migrations
                         .HasColumnType("text")
                         .HasColumnName("category");
 
-                    b.Property<int?>("ChallengeId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text")
@@ -423,8 +423,6 @@ namespace Server.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ChallengeId");
-
                     b.ToTable("sustainableactivities", (string)null);
                 });
 
@@ -441,6 +439,12 @@ namespace Server.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("accommodationtype");
+
+                    b.Property<string>("AvatarItems")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AvatarStyle")
+                        .HasColumnType("text");
 
                     b.Property<string>("Course")
                         .IsRequired()
@@ -611,13 +615,6 @@ namespace Server.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Server.Models.SustainableActivity", b =>
-                {
-                    b.HasOne("Server.Models.Challenge", null)
-                        .WithMany("Activities")
-                        .HasForeignKey("ChallengeId");
-                });
-
             modelBuilder.Entity("Server.Models.UserChallenge", b =>
                 {
                     b.HasOne("Server.Models.Challenge", "Challenge")
@@ -639,8 +636,6 @@ namespace Server.Migrations
 
             modelBuilder.Entity("Server.Models.Challenge", b =>
                 {
-                    b.Navigation("Activities");
-
                     b.Navigation("UserChallenges");
                 });
 

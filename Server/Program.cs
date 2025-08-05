@@ -11,6 +11,7 @@ using Server.DTOs;
 using Server.Services.Interfaces;
 using Server.Services.Implementations;
 using Server.Repositories;
+using Server.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,13 +46,15 @@ builder.Services.AddScoped<IActivitiesService, ActivitiesService>();
 builder.Services.AddScoped<IEventsService, EventsService>();
 builder.Services.AddScoped<IChallengesService, ChallengesService>();
 builder.Services.AddScoped<IRolesService, RolesService>();
+builder.Services.AddHttpClient<IClimatiqService, ClimatiqService>();
+
 
 // Register repositories for DI
-builder.Services.AddScoped<ActivityCompletionRepository>();
-builder.Services.AddScoped<ChallengeRepository>();
-builder.Services.AddScoped<SustainableEventRepository>();
-builder.Services.AddScoped<UserRepository>();
-builder.Services.AddScoped<SustainableActivityRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IActivityCompletionRepository, ActivityCompletionRepository>();
+builder.Services.AddScoped<IChallengeRepository, ChallengeRepository>();
+builder.Services.AddScoped<ISustainableActivityRepository, SustainableActivityRepository>();
+builder.Services.AddScoped<ISustainableEventRepository, SustainableEventRepository>();
 
 // Add CORS configuration
 builder.Services.AddCors(options =>

@@ -4,6 +4,7 @@ using Server.Services.Implementations;
 using Server.Services.Interfaces;
 using Server.Models;
 using System.Threading.Tasks;
+using Server.Repositories.Interfaces;
 
 public class UserServiceTests
 {

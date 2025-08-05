@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Server.DTOs;
+using Server.Repositories.Interfaces;
 
 namespace Server.Services.Implementations
 {
@@ -68,7 +69,7 @@ namespace Server.Services.Implementations
         public async Task<IEnumerable<object>> GetUserChallengesAsync(int userId)
         {
             var challenges = await _challengeRepository.GetAllAsync();
-            var userChallenges = challenges
+            return challenges
                 .SelectMany(c => c.UserChallenges
                     .Where(uc => uc.UserId == userId)
                     .Select(uc => new
@@ -84,15 +85,12 @@ namespace Server.Services.Implementations
                         joinedDate = uc.JoinedDate
                     }))
                 .ToList();
-            return userChallenges;
         }
 
         public async Task<object> CreateChallengeAsync(Challenge challenge)
         {
-            if (challenge.Activities != null && challenge.Activities.Any())
-            {
-                challenge.Activities = null;
-            }
+            // Remove invalid navigation reference
+            challenge.Activities = null;
 
             await _challengeRepository.AddAsync(challenge);
 
@@ -108,36 +106,29 @@ namespace Server.Services.Implementations
         }
 
         public async Task<bool> JoinChallengeAsync(int challengeId, int userId)
-        {
-            var challenge = await _challengeRepository.GetByIdAsync(challengeId);
-            if (challenge == null) return false;
+{
+    var challenge = await _challengeRepository.GetByIdAsync(challengeId);
+    if (challenge == null) return false;
 
-            if (challenge.UserChallenges.Any(uc => uc.UserId == userId))
-                return false;
+    if (challenge.UserChallenges.Any(uc => uc.UserId == userId))
+        return false;
 
-            challenge.UserChallenges.Add(new UserChallenge
-            {
-                UserId = userId,
-                ChallengeId = challengeId,
-                JoinedDate = DateTime.UtcNow,
-                Progress = 0,
-                Status = "In Progress",
-                Completed = false
-            });
+   var userChallenge = new UserChallenge
+{
+    UserId = userId,
+    ChallengeId = challengeId,
+    JoinedDate = DateTime.UtcNow,
+    Progress = 0,
+    Status = "In Progress",
+    Completed = false
+};
 
-            await _challengeRepository.UpdateAsync(challenge);
-            return true;
-        }
+await _challengeRepository.AddUserChallengeAsync(userChallenge);
 
-        public async Task<bool> AddActivitiesToChallengeAsync(int challengeId, List<int> activityIds)
-        {
-            var challenge = await _challengeRepository.GetByIdAsync(challengeId);
-            if (challenge == null) return false;
 
-            challenge.Activities = null; // Or set to a new list if you fetch them
-            await _challengeRepository.UpdateAsync(challenge);
-            return true;
-        }
+    return true;
+}
+
 
         public async Task<IEnumerable<object>> GetPastChallengesAsync()
         {
@@ -170,11 +161,6 @@ namespace Server.Services.Implementations
             existingChallenge.EndDate = challenge.EndDate;
             existingChallenge.PointsReward = challenge.PointsReward;
             existingChallenge.Category = challenge.Category;
-
-            if (challenge.Activities != null)
-            {
-                existingChallenge.Activities = null;
-            }
 
             await _challengeRepository.UpdateAsync(existingChallenge);
 
@@ -249,5 +235,21 @@ namespace Server.Services.Implementations
                 isActive = challenge.StartDate <= DateTime.UtcNow && challenge.EndDate >= DateTime.UtcNow
             };
         }
+
+        public async Task<bool> AddActivitiesToChallengeAsync(int challengeId, List<int> activityIds)
+{
+    var challenge = await _challengeRepository.GetByIdAsync(challengeId);
+    if (challenge == null) return false;
+
+    // Optional: clear existing activities first
+    // challenge.Activities.Clear();
+
+    // Since you're avoiding includes on Activities, we don't load them — just null it out or fetch if needed
+    challenge.Activities = null;
+
+    await _challengeRepository.UpdateAsync(challenge);
+    return true;
+}
+
     }
 }

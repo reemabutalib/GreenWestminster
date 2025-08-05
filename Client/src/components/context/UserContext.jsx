@@ -181,14 +181,37 @@ export const AuthProvider = ({ children }) => {
     console.log('[UserContext] logout: cleared localStorage and currentUser');
   };
 
+  const updateAvatar = async ({ userId, avatarStyle, avatarItems }) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/api/users/avatar`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ userId, avatarStyle, avatarItems }),
+    });
+    if (!response.ok) throw new Error('Failed to update avatar');
+    // Optionally, refresh user data here
+    return true;
+  } catch (err) {
+    console.error('[UserContext] updateAvatar error:', err);
+    return false;
+  }
+};
+
   const value = {
     currentUser,
     loading,
     authError,
     login,
     register,
-    logout
+    logout,
+    updateAvatar,
   };
+
+  
 
   return (
     <AuthContext.Provider value={value}>

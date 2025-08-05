@@ -22,5 +22,6 @@ namespace Server.Services.Interfaces
         Task<IEnumerable<object>> GetPointsHistoryAsync(int userId);
         Task<object> AddPointsAsync(int userId, int points);
         Task<object?> GetLevelInfoAsync(int userId);
+        Task<bool> UpdateAvatarAsync(int userId, string avatarStyle);
     }
 }

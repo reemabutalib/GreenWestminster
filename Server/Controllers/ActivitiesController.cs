@@ -24,12 +24,20 @@ public class ActivitiesController : ControllerBase
     private readonly IActivitiesService _activitiesService;
     private readonly ILogger<ActivitiesController> _logger;
     private readonly AppDbContext _context;
+    private readonly IClimatiqService _climatiqService;
 
-    public ActivitiesController(IActivitiesService activitiesService, ILogger<ActivitiesController> logger)
+    public ActivitiesController(
+    IActivitiesService activitiesService,
+    ILogger<ActivitiesController> logger,
+    AppDbContext context,
+    IClimatiqService climatiqService)
     {
         _activitiesService = activitiesService;
         _logger = logger;
+        _context = context;
+        _climatiqService = climatiqService;
     }
+
 
     // GET: api/activities
     [HttpGet]
@@ -333,23 +341,72 @@ public class ActivitiesController : ControllerBase
     {
         try
         {
+            if (completionData == null)
+            {
+                _logger.LogWarning("Received null completionData for activity {Id}", id);
+                return BadRequest(new { message = "Invalid or missing activity completion data." });
+            }
+
+
             _logger.LogInformation("Marking activity {Id} as completed for user {UserId}", id, completionData.UserId);
             
             // Get activity data using direct SQL
             var activityQuery = "SELECT id, pointsvalue FROM sustainableactivities WHERE id = @id";
             var activityParam = new NpgsqlParameter("id", id);
-            
+
             var activity = await _context.SustainableActivities
-                .FromSqlRaw(activityQuery, activityParam)
-                .Select(a => new { a.Id, a.PointsValue })
                 .AsNoTracking()
-                .FirstOrDefaultAsync();
-                
+                .FirstOrDefaultAsync(a => a.Id == id);
+
+            // 1. Define category-to-activity_id mappings
+var emissionMappings = new Dictionary<string, (string activityId, string unitType, string unit, Func<double, double>)>
+{
+    ["energy"] = ("electricity-supply_grid-source_supplier_mix", "energy", "kWh", v => v),
+    ["water"] = ("water_supply-type_na", "volume", "m3", v => v / 1000), // L to m³
+    ["waste"] = ("waste_type_mixed-disposal_landfill", "weight", "kg", v => v),
+    ["transportation"] = ("passenger_vehicle-vehicle_type_car-fuel_source_petrol-distance_na-vehicle_age_na", "distance", "km", v => v),
+    ["food"] = ("food_product-type_uk_average_diet", "mass", "kg", v => v)
+};
+
+
+// 2. Prepare the CO₂e default
+double co2e = 0;
+
+// Normalize category before matching
+string normalizedCategory = activity.Category?.ToLowerInvariant().Trim();
+
+if (normalizedCategory.Contains("energy"))
+    normalizedCategory = "energy";
+else if (normalizedCategory.Contains("water"))
+    normalizedCategory = "water";
+else if (normalizedCategory.Contains("transport"))
+    normalizedCategory = "transportation";
+else if (normalizedCategory.Contains("waste"))
+    normalizedCategory = "waste";
+else if (normalizedCategory.Contains("food"))
+    normalizedCategory = "food";
+
+if (completionData.Quantity != null && completionData.Quantity > 0)
+{
+    _logger.LogInformation("Quantity submitted: {Quantity}", completionData.Quantity);
+    co2e = await _climatiqService.CalculateCo2Async(normalizedCategory, completionData.Quantity.Value);
+    _logger.LogInformation("Fetched CO2e via ClimatiqService: {co2e} for category '{category}'", co2e, normalizedCategory);
+}
+
+
+else
+{
+    _logger.LogWarning("Unsupported category for CO2 calculation: {Category}", activity.Category);
+}
+
+
+
             if (activity == null)
             {
                 _logger.LogWarning("Activity {Id} not found during completion attempt", id);
                 return NotFound(new { message = $"Activity with ID {id} not found" });
             }
+
 
             // Get the user with a direct query
             var userQuery = "SELECT id, points, currentstreak, maxstreak, \"Level\" FROM users WHERE id = @userId";
@@ -463,9 +520,9 @@ public class ActivitiesController : ControllerBase
 
             // Insert completion record with all fields
             var insertSql = @"
-                INSERT INTO activitycompletions (userid, activityid, completedat, imagepath, notes, reviewstatus, pointsearned) 
-                VALUES (@userId, @activityId, @completedAt, @imagePath, @notes, @reviewStatus, @pointsEarned)";
-                
+INSERT INTO activitycompletions (userid, activityid, completedat, ""ImagePath"", ""Notes"", ""ReviewStatus"", pointsearned, co2e_reduction, ""Quantity"") 
+VALUES (@userId, @activityId, @completedAt, @imagePath, @notes, @reviewStatus, @pointsEarned, @co2eReduction, @quantity)";
+
             var insertParams = new[]
             {
                 new NpgsqlParameter("userId", completionData.UserId),
@@ -474,7 +531,10 @@ public class ActivitiesController : ControllerBase
                 new NpgsqlParameter("imagePath", imageFileName ?? (object)DBNull.Value),
                 new NpgsqlParameter("notes", completionData.Notes ?? (object)DBNull.Value),
                 new NpgsqlParameter("reviewStatus", "Pending Review"),
-                new NpgsqlParameter("pointsEarned", activity.PointsValue)
+                new NpgsqlParameter("pointsEarned", activity.PointsValue),
+                new NpgsqlParameter("co2eReduction", co2e),
+                new NpgsqlParameter("quantity", completionData.Quantity ?? (object)DBNull.Value)
+
             };
             
             await _context.Database.ExecuteSqlRawAsync(insertSql, insertParams);
@@ -584,7 +644,8 @@ public class ActivitiesController : ControllerBase
                 reviewStatus = "Pending Review",
                 Level = newLevel,
                 LeveledUp = LeveledUp,
-                pointsToNextLevel = pointsToNextLevel
+                pointsToNextLevel = pointsToNextLevel,
+                co2eReduction = co2e 
             });
         }
         catch (Exception ex)
@@ -611,13 +672,13 @@ public class ActivitiesController : ControllerBase
 
             // Use raw SQL to avoid EF Core mapping issues with dynamically added columns
             var sql = @"
-            SELECT ac.id, ac.userid, ac.activityid, ac.completedat, 
-                   ac.imagepath, ac.notes, ac.reviewstatus,
-                   sa.pointsvalue as pointsearned,
-                   sa.id as activity_id, sa.title as activity_title, 
-                   sa.description as activity_description, sa.pointsvalue as activity_pointsvalue
-            FROM activitycompletions ac
-            JOIN sustainableactivities sa ON ac.activityid = sa.id
+            SELECT ac.id, ac.userid, ac.activityid, ac.completedat,
+       ac.imagepath, ac.notes, ac.reviewstatus, ac.pointsearned,
+       ac.quantity, ac.co2e_reduction,  
+       sa.id AS activity_id, sa.title AS activity_title, 
+       sa.description AS activity_description, sa.pointsvalue AS activity_pointsvalue
+FROM activitycompletions ac
+JOIN sustainableactivities sa ON ac.activityid = sa.id
             WHERE ac.userid = @userId";
 
             var parameters = new List<NpgsqlParameter> { new NpgsqlParameter("userId", userId) };
@@ -668,6 +729,11 @@ public class ActivitiesController : ControllerBase
                             notes = reader.IsDBNull(reader.GetOrdinal("notes")) ? null : reader.GetString(reader.GetOrdinal("notes")),
                             reviewStatus = reader.IsDBNull(reader.GetOrdinal("reviewstatus")) ? "Pending Review" : reader.GetString(reader.GetOrdinal("reviewstatus")),
                             pointsEarned = reader.GetInt32(reader.GetOrdinal("pointsearned")),
+
+                            // ✅ NEW FIELDS
+                            quantity = reader.IsDBNull(reader.GetOrdinal("quantity")) ? 0.0 : reader.GetDouble(reader.GetOrdinal("quantity")),
+                            co2eReduction = reader.IsDBNull(reader.GetOrdinal("co2e_reduction")) ? 0.0 : reader.GetDouble(reader.GetOrdinal("co2e_reduction")),
+
                             activity = new
                             {
                                 id = reader.GetInt32(reader.GetOrdinal("activity_id")),
@@ -680,7 +746,7 @@ public class ActivitiesController : ControllerBase
                         completions.Add(completion);
                     }
                 }
-            }
+}
 
             // Transform the results to include full image URLs
             var result = completions.Select(c => new
@@ -977,6 +1043,30 @@ public class ActivitiesController : ControllerBase
             });
         }
     }
+
+  [HttpGet("users/{userId}/carbon-impact")]
+public async Task<IActionResult> GetCarbonImpact(int userId)
+{
+    var completions = await _context.ActivityCompletions
+        .Include(ac => ac.Activity)
+        .Where(ac => ac.UserId == userId)
+        .ToListAsync();
+
+    double totalCO2 = completions.Sum(c => c.Co2eReduction ?? 0);
+    double totalWater = completions
+        .Where(c => c.Activity.Category.ToLower().Contains("water"))
+        .Sum(c => c.Quantity ?? 0);
+
+    return Ok(new
+    {
+        co2Reduced = Math.Round(totalCO2, 2),
+        treesEquivalent = Math.Round(totalCO2 / 21.0, 2),
+        waterSaved = Math.Round(totalWater, 2)
+    });
+}
+
+
+
 
     [HttpGet("debug-auth")]
 public IActionResult DebugAuth()

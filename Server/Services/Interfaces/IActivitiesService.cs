@@ -16,5 +16,6 @@ namespace Server.Services.Interfaces
         Task<bool> UpdateActivityAsync(SustainableActivity activity);
         Task<bool> DeleteActivityAsync(int id);
         Task<bool> ActivityExists(int id);
+        Task<List<ActivityCompletion>> GetCompletionsForUserAsync(int userId);
     }
 }

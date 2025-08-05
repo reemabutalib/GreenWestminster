@@ -8,14 +8,15 @@ using System.Linq;
 using System.Threading.Tasks;
 using Server.DTOs;
 using Server.Repositories;
+using Server.Repositories.Interfaces;
 
 namespace Server.Services.Implementations
 {
     public class EventsService : IEventsService
     {
-        private readonly SustainableEventRepository _eventRepository;
+        private readonly ISustainableEventRepository _eventRepository;
 
-        public EventsService(SustainableEventRepository eventRepository)
+        public EventsService(ISustainableEventRepository eventRepository)
         {
             _eventRepository = eventRepository;
         }

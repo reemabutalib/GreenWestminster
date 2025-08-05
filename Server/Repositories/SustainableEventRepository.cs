@@ -1,14 +1,13 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Server.Data;
 using Server.Models;
+using Server.Repositories.Interfaces;
 
 namespace Server.Repositories
 {
-    public class SustainableEventRepository
+    public class SustainableEventRepository : ISustainableEventRepository
     {
         private readonly AppDbContext _context;
 

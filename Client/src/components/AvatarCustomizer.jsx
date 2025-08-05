@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/UserContext';
 import '../styling/AvatarCustomizer.css'; 
 
@@ -6,53 +6,75 @@ const avatarStyles = [
   { name: 'Classic', img: '/avatars/classic.png', unlock: 0 },
   { name: 'Eco Hero', img: '/avatars/eco-hero.png', unlock: 100 },
   { name: 'Streak Master', img: '/avatars/streak-master.png', unlock: 7, unlockType: 'streak' },
-  // Add more styles as needed
 ];
 
-const visualItems = [
-  { name: 'Leaf Hat', img: '/avatars/items/leaf-hat.png', unlock: 50 },
-  { name: 'Recycling Cape', img: '/avatars/items/cape.png', unlock: 200 },
-  { name: 'Golden Badge', img: '/avatars/items/gold-badge.png', unlock: 14, unlockType: 'streak' },
-  // Add more items as needed
-];
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80';
 
 const AvatarCustomizer = () => {
-  const { currentUser, updateAvatar } = useAuth();
-  // Example: currentUser.points, currentUser.streak
-  const [selectedStyle, setSelectedStyle] = useState(currentUser.avatarStyle || avatarStyles[0].name);
-  const [selectedItems, setSelectedItems] = useState(currentUser.avatarItems || []);
+  const { currentUser } = useAuth();
+  const [userData, setUserData] = useState(null);
 
-  const canUnlock = (item) => {
-    if (item.unlockType === 'streak') {
-      return (currentUser.streak || 0) >= item.unlock;
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!currentUser) return;
+      const token = currentUser.token || localStorage.getItem('token');
+      const userId = currentUser.id || currentUser.userId;
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUserData(data);
+      }
+    };
+    fetchUserData();
+  }, [currentUser]);
+
+  const [selectedStyle, setSelectedStyle] = useState(avatarStyles[0].name);
+
+  useEffect(() => {
+    if (userData) {
+      setSelectedStyle(userData.avatarStyle || avatarStyles[0].name);
     }
-    return (currentUser.points || 0) >= item.unlock;
+  }, [userData]);
+
+  if (!userData) {
+    return <div>Loading...</div>;
+  }
+
+  const canUnlock = (style) => {
+    if (style.unlockType === 'streak') {
+      return (userData.streak || 0) >= style.unlock;
+    }
+    return (userData.points || 0) >= style.unlock;
   };
 
   const handleStyleSelect = (style) => {
     if (canUnlock(style)) setSelectedStyle(style.name);
   };
 
-  const handleItemToggle = (item) => {
-    if (!canUnlock(item)) return;
-    setSelectedItems((prev) =>
-      prev.includes(item.name)
-        ? prev.filter((i) => i !== item.name)
-        : [...prev, item.name]
-    );
-  };
-
-  const handleSave = () => {
-    // Save avatar choices to backend or context
-    updateAvatar({ avatarStyle: selectedStyle, avatarItems: selectedItems });
-    alert('Avatar updated!');
+  const handleSave = async () => {
+    const res = await fetch(`${API_BASE_URL}/api/users/avatar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: userData.id,
+        avatarStyle: selectedStyle,
+        AvatarItems: [] // Send empty array since items are removed
+      }),
+    });
+    if (res.ok) {
+      alert('Avatar updated!');
+    } else {
+      alert('Failed to update avatar');
+    }
   };
 
   return (
     <div className="avatar-customizer">
-      <h2>Customize Your Avatar</h2>
+      <h2>Customise Your Avatar</h2>
       <p>
-        Points: <strong>{currentUser.points}</strong> | Streak: <strong>{currentUser.streak}</strong>
+        Points: <strong>{userData.points ?? 0}</strong> | Streak: <strong>{userData.streak ?? 0}</strong>
       </p>
       <div className="avatar-section">
         <h3>Choose Your Style</h3>
@@ -74,32 +96,6 @@ const AvatarCustomizer = () => {
               <img src={style.img} alt={style.name} className="avatar-img" />
               <div>{style.name}</div>
               {!canUnlock(style) && (
-                <div className="locked-overlay">🔒</div>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="avatar-section">
-        <h3>Unlockable Items</h3>
-        <div className="avatar-items-list">
-          {visualItems.map((item) => (
-            <button
-              key={item.name}
-              className={`avatar-item-btn${selectedItems.includes(item.name) ? ' selected' : ''}`}
-              onClick={() => handleItemToggle(item)}
-              disabled={!canUnlock(item)}
-              title={
-                canUnlock(item)
-                  ? `Toggle ${item.name}`
-                  : item.unlockType === 'streak'
-                  ? `Unlock with ${item.unlock} day streak`
-                  : `Unlock at ${item.unlock} points`
-              }
-            >
-              <img src={item.img} alt={item.name} className="avatar-img" />
-              <div>{item.name}</div>
-              {!canUnlock(item) && (
                 <div className="locked-overlay">🔒</div>
               )}
             </button>

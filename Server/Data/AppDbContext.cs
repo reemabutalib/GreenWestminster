@@ -173,8 +173,8 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
         // Tell EF Core there's no direct relationship between Challenge and SustainableActivity
         // This will prevent it from trying to query for a non-existent ChallengeId column
         modelBuilder.Entity<Challenge>()
-            .Navigation(c => c.Activities)
-            .UsePropertyAccessMode(PropertyAccessMode.Property);
+            .Ignore(c => c.Activities);
+
     }
 }
 

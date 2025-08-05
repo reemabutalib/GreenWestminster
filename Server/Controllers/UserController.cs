@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Server.Services.Interfaces;
 using Server.Models;
+using Server.DTOs;
+using Server.Repositories;
 
 namespace Server.Controllers;
 
@@ -27,15 +29,32 @@ public class UsersController : ControllerBase
         return Ok(users);
     }
 
-    // GET: api/users/5
     [HttpGet("{id}")]
-    public async Task<ActionResult<User>> GetUser(int id)
+public async Task<ActionResult<UserDto>> GetUser(int id)
+{
+    var user = await _userService.GetUserAsync(id);
+    if (user == null)
+        return NotFound();
+
+    var dto = new UserDto
     {
-        var user = await _userService.GetUserAsync(id);
-        if (user == null)
-            return NotFound();
-        return Ok(user);
-    }
+        Id = user.Id,
+        Username = user.Username,
+        Email = user.Email,
+        Points = user.Points,
+        AvatarStyle = user.AvatarStyle,
+        Level = user.Level,
+        CurrentStreak = user.CurrentStreak,
+        MaxStreak = user.MaxStreak,
+        LastActivityDate = user.LastActivityDate,
+        Course = user.Course,
+        YearOfStudy = user.YearOfStudy,
+        AccommodationType = user.AccommodationType
+    };
+
+    return Ok(dto);
+}
+
 
     // POST: api/users
     [HttpPost]
@@ -150,4 +169,15 @@ public class UsersController : ControllerBase
             return NotFound("User not found");
         return Ok(info);
     }
+
+    // POST: api/users/avatar
+    [HttpPost("avatar")]
+public async Task<IActionResult> UpdateAvatar([FromBody] AvatarUpdateDto dto)
+{
+    var result = await _userService.UpdateAvatarAsync(dto.UserId, dto.AvatarStyle);
+    if (!result) return NotFound();
+    return Ok();
 }
+   
+}
+

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Server.Data;
 using Server.Models;
-using Server.Services.Interfaces;
+using Server.Repositories.Interfaces;
 
 namespace Server.Repositories
 {

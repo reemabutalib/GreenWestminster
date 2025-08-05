@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Server.Models;
 
+namespace Server.Repositories.Interfaces
+{
 public interface IUserRepository
 {
     Task<User?> GetByIdAsync(int id);
@@ -10,4 +12,5 @@ public interface IUserRepository
     Task AddAsync(User user);
     Task UpdateAsync(User user);
     Task DeleteAsync(int id);
+}
 }

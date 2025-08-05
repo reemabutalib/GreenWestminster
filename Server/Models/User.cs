@@ -12,6 +12,8 @@ public class User
     public int MaxStreak { get; set; } = 0;
     public int Level { get; set; } = 1;
     public DateTime LastActivityDate { get; set; } = DateTime.UtcNow;
+    public string? AvatarStyle { get; set; }
+    public string? AvatarItems { get; set; }
 
     // New student-specific fields
     public string Course { get; set; } = string.Empty;
