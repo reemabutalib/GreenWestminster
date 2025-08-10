@@ -80,17 +80,21 @@ builder.Services.AddAuthentication(options =>
     options.SaveToken = true;
     options.RequireHttpsMetadata = false; // Set to true in production
     options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = false, // Set to true and specify issuer in production
-        ValidateAudience = false, // Set to true and specify audience in production
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"] ??
-                throw new InvalidOperationException("JWT key is not configured"))),
-        RoleClaimType = "role", // This is crucial! Match the claim type in your token
-        NameClaimType = "unique_name"
-    };
+{
+    ValidateIssuer = false,
+    ValidateAudience = false,
+    ValidateLifetime = true,
+    ValidateIssuerSigningKey = true,
+    IssuerSigningKey = new SymmetricSecurityKey(
+        Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"] ??
+            throw new InvalidOperationException("JWT key is not configured"))),
+    
+    // ✅ Fix this line:
+    RoleClaimType = ClaimTypes.Role,
+    
+    NameClaimType = "unique_name"
+};
+
 
     // Return 401 Unauthorized instead of redirecting to login page
     options.Events = new JwtBearerEvents

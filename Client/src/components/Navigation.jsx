@@ -31,8 +31,15 @@ const Navigation = () => {
   return (
     <nav className="nav-container">
       <div className="nav-logo">
-        <Link to="/">Green Westminster</Link>
-      </div>
+  <Link to="/">
+    <img 
+      src="/images/GW-logo.png" 
+      alt="Green Westminster Logo" 
+      style={{ height: '100px', objectFit: 'contain' }}
+    />
+  </Link>
+</div>
+
       
       <div className="nav-links">
         {/* Events is visible to everyone */}
@@ -68,36 +75,29 @@ const Navigation = () => {
       </div>
       
       <div className="nav-auth">
-        {isLoggedIn ? (
-          <>
-            {!isAdmin && (
-              <Link to="/profile" className="profile-link">
-                <div className="profile-icon">
-                  <i className="fa fa-user"></i>
-                </div>
-                Profile
-              </Link>
-            )}
-            {isAdmin && (
-              <span className="admin-badge">Admin</span>
-            )}
-            <Logout />
-          </>
-        ) : (
-          <>
-            <Link to="/login" className="login-btn">
-              Student Login
-            </Link>
-            <Link to="/register" className="register-btn">
-              Register
-            </Link>
-            <Link to="/admin/login" className="admin-login-btn">
-              Admin
-            </Link>
-            <Link to="/about-us">About Us</Link>
-          </>
-        )}
-      </div>
+  {isLoggedIn ? (
+    <>
+      {isAdmin && (
+        <span className="admin-badge">Admin</span>
+      )}
+      <Logout />
+    </>
+  ) : (
+    <>
+      <Link to="/login" className="login-btn">
+        Student Login
+      </Link>
+      <Link to="/register" className="register-btn">
+        Register
+      </Link>
+      <Link to="/admin/login" className="admin-login-btn">
+        Admin
+      </Link>
+      <Link to="/about-us">About Us</Link>
+    </>
+  )}
+</div>
+
     </nav>
   );
 };

@@ -10,6 +10,7 @@ const AdminDashboard = () => {
         <Link to="/admin/dashboard/activities" className="admin-nav-link">Manage Activities</Link>
         <Link to="/admin/dashboard/events" className="admin-nav-link">Manage Events</Link>
         <Link to="/admin/dashboard/challenges" className="admin-nav-link">Manage Challenges</Link>
+        <Link to="/admin/dashboard/review" className="admin-nav-link">Review Submissions</Link>
       </nav>
       <div className="admin-content">
         <Outlet />

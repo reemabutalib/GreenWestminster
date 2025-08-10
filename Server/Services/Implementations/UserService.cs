@@ -6,6 +6,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Server.Repositories;
 using Server.Repositories.Interfaces;
+using Server.DTOs;
+using Server.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace Server.Services.Implementations
 {
@@ -15,17 +18,22 @@ namespace Server.Services.Implementations
         private readonly IActivityCompletionRepository _activityCompletionRepository;
         private readonly IChallengeRepository _challengeRepository;
         private readonly ISustainableActivityRepository _activityRepository;
+        private readonly AppDbContext _context;
+        
 
         public UserService(
-     IUserRepository userRepository,
-     IActivityCompletionRepository activityCompletionRepository,
-     IChallengeRepository challengeRepository,
-     ISustainableActivityRepository activityRepository) // <-- use interface
+            IUserRepository userRepository,
+            IActivityCompletionRepository activityCompletionRepository,
+            IChallengeRepository challengeRepository,
+            ISustainableActivityRepository activityRepository,
+            AppDbContext context
+            )
         {
             _userRepository = userRepository;
             _activityCompletionRepository = activityCompletionRepository;
             _challengeRepository = challengeRepository;
             _activityRepository = activityRepository;
+            _context = context;
         }
 
         public async Task<IEnumerable<User>> GetUsersAsync()
@@ -40,27 +48,37 @@ namespace Server.Services.Implementations
             return user;
         }
 
-        public async Task<IEnumerable<User>> GetLeaderboardAsync(string timeFrame)
+        public async Task<IEnumerable<LeaderboardUserDto>> GetLeaderboardAsync(string timeFrame)
+{
+    var query = _context.Users
+        .Where(u => u.Username != "sustainabilityteam") // Exclude admin account
+        .AsQueryable();
+
+    if (timeFrame == "month")
+    {
+        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        query = query.Where(u => u.LastActivityDate >= monthStart);
+    }
+    else if (timeFrame == "week")
+    {
+        var weekStart = DateTime.UtcNow.Date.AddDays(-(int)DateTime.UtcNow.DayOfWeek);
+        query = query.Where(u => u.LastActivityDate >= weekStart);
+    }
+
+    var leaderboard = await query
+        .OrderByDescending(u => u.Points)
+        .Select(u => new LeaderboardUserDto
         {
-            var users = await _userRepository.GetAllAsync();
+            Id = u.Id,
+            Username = u.Username,
+            Points = u.Points,
+            CurrentStreak = u.CurrentStreak
+        })
+        .ToListAsync();
 
-            IEnumerable<User> filtered = users;
-            if (timeFrame == "week")
-            {
-                DateTime oneWeekAgo = DateTime.UtcNow.AddDays(-7);
-                filtered = users.Where(u => u.LastActivityDate >= oneWeekAgo);
-            }
-            else if (timeFrame == "month")
-            {
-                DateTime oneMonthAgo = DateTime.UtcNow.AddMonths(-1);
-                filtered = users.Where(u => u.LastActivityDate >= oneMonthAgo);
-            }
+    return leaderboard;
+}
 
-            return filtered
-                .OrderByDescending(u => u.Points)
-                .Take(10)
-                .ToList();
-        }
 
         public async Task<object?> GetUserStatsAsync(int id)
         {
@@ -364,12 +382,13 @@ namespace Server.Services.Implementations
         }
 
         public async Task<bool> UpdateAvatarAsync(int userId, string avatarStyle)
-{
-    var user = await _userRepository.GetByIdAsync(userId);
-    if (user == null) return false;
-    user.AvatarStyle = avatarStyle;
-    await _userRepository.UpdateAsync(user);
-    return true;
-}
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null) return false;
+            user.AvatarStyle = avatarStyle;
+            await _userRepository.UpdateAsync(user);
+            return true;
+        }
+
     }
 }

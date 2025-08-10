@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using Server.Models;
 using Server.Repositories.Interfaces;
 using Server.Services.Interfaces;
-using Server.Repositories;
 using System.Collections.Generic;
 
 namespace Server.Services.Implementations
@@ -17,6 +16,12 @@ namespace Server.Services.Implementations
         private readonly IChallengeRepository _challengeRepository;
         private readonly ISustainableEventRepository _eventRepository;
         private readonly ILogger<AdminService> _logger;
+
+        // Central place to exclude usernames from admin views/stats
+        private static readonly HashSet<string> EXCLUDED_USERNAMES = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "sustainabilityteam"
+        };
 
         public AdminService(
             IUserRepository userRepository,
@@ -36,9 +41,12 @@ namespace Server.Services.Implementations
         {
             _logger.LogInformation("AdminService: Fetching user engagement statistics");
 
-            var users = await _userRepository.GetAllAsync();
+            // Users (exclude sustainabilityteam)
+            var usersAll = await _userRepository.GetAllAsync();
+            var users = usersAll.Where(u => !EXCLUDED_USERNAMES.Contains(u.Username)).ToList();
+
             int totalUsers = users.Count;
-            int activeUsersLast7Days = users.Count(u => u.LastActivityDate >= DateTime.UtcNow.AddDays(-7));
+            int activeUsersLast7Days  = users.Count(u => u.LastActivityDate >= DateTime.UtcNow.AddDays(-7));
             int activeUsersLast30Days = users.Count(u => u.LastActivityDate >= DateTime.UtcNow.AddDays(-30));
 
             var topUsers = users
@@ -55,7 +63,12 @@ namespace Server.Services.Implementations
                 })
                 .ToList();
 
-            var activities = await _activityCompletionRepository.GetAllAsync();
+            // Activity completions (exclude those created by sustainabilityteam)
+            var allCompletions = await _activityCompletionRepository.GetAllAsync();
+            var activities = allCompletions
+                .Where(ac => ac.User != null && !EXCLUDED_USERNAMES.Contains(ac.User.Username))
+                .ToList();
+
             int totalCompletions = activities.Count;
 
             var activityGroups = activities
@@ -69,30 +82,36 @@ namespace Server.Services.Implementations
                 .Take(5)
                 .ToList();
 
-            // Get activity details for popular activities
+            // Look up activity details for popular activities
             var activityIds = activityGroups.Select(a => a.activityId).ToList();
-            var allActivities = await Task.FromResult(activities.Select(ac => ac.Activity).Distinct().ToList());
+            var allActivities = activities
+                .Where(ac => ac.Activity != null)
+                .Select(ac => ac.Activity)
+                .Distinct()
+                .ToList();
+
             var activityDetails = allActivities
-                .Where(a => activityIds.Contains(a.Id))
+                .Where(a => a != null)
                 .ToDictionary(a => a.Id, a => new { a.Title, a.Category });
 
             var popularActivitiesWithDetails = activityGroups
                 .Select(a => new
                 {
                     activityId = a.activityId,
-                    title = activityDetails.ContainsKey(a.activityId) ? activityDetails[a.activityId].Title : "Unknown Activity",
-                    category = activityDetails.ContainsKey(a.activityId) ? activityDetails[a.activityId].Category : "Unknown",
+                    title = activityDetails.TryGetValue(a.activityId, out var info) ? info.Title : "Unknown Activity",
+                    category = activityDetails.TryGetValue(a.activityId, out var info2) ? info2.Category : "Unknown",
                     completionCount = a.completionCount
                 })
                 .ToList();
 
-            var sustainableActivities = allActivities;
-            int totalActivities = sustainableActivities.Count;
+            int totalActivities = allActivities.Count;
 
+            // Events (unchanged)
             var events = await _eventRepository.GetAllAsync();
             int totalEvents = events.Count;
             int upcomingEvents = events.Count(e => e.StartDate > DateTime.UtcNow);
 
+            // Points distribution (based on filtered users)
             var pointsDistribution = users
                 .GroupBy(u => u.Points / 100)
                 .Select(g => new
@@ -122,7 +141,12 @@ namespace Server.Services.Implementations
         {
             _logger.LogInformation("AdminService: Fetching activity completions");
 
-            var completions = await _activityCompletionRepository.GetAllAsync();
+            var all = await _activityCompletionRepository.GetAllAsync();
+
+            // Exclude sustainabilityteam here too
+            var completions = all
+                .Where(ac => ac.User != null && !EXCLUDED_USERNAMES.Contains(ac.User.Username))
+                .ToList();
 
             if (startDate.HasValue)
                 completions = completions.Where(ac => ac.CompletedAt >= startDate.Value).ToList();

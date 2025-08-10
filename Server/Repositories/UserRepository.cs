@@ -62,5 +62,15 @@ namespace Server.Repositories
                 await _context.SaveChangesAsync();
             }
         }
+
+        public async Task<List<User>> GetLeaderboardUsersAsync(string criteria)
+        {
+            // Example implementation: order by CompletedActivities count descending
+            return await _context.Users
+                .Include(u => u.CompletedActivities)
+                .Include(u => u.UserChallenges)
+                .OrderByDescending(u => u.CompletedActivities.Count)
+                .ToListAsync();
+        }
     }
 }

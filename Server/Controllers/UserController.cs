@@ -66,7 +66,7 @@ public async Task<ActionResult<UserDto>> GetUser(int id)
 
     // GET: api/users/leaderboard
     [HttpGet("leaderboard")]
-    public async Task<ActionResult<IEnumerable<User>>> GetLeaderboard([FromQuery] string timeFrame = "all-time")
+    public async Task<ActionResult<IEnumerable<LeaderboardUserDto>>> GetLeaderboard([FromQuery] string timeFrame = "all-time")
     {
         var leaderboard = await _userService.GetLeaderboardAsync(timeFrame);
         return Ok(leaderboard);

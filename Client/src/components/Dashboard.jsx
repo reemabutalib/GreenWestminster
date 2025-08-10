@@ -10,6 +10,36 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
 
+// Add this at the top, after imports
+const tipsByCategory = {
+  Water: [
+    "Fix leaky taps to save up to 90 liters a week.",
+    "Use a bowl to wash veggies instead of running water.",
+    "Install a low-flow showerhead to save water and energy."
+  ],
+  Energy: [
+    "Turn off appliances at the wall to avoid standby drain.",
+    "Switch to LED bulbs—they use 80% less energy.",
+    "Only boil as much water as you need in the kettle."
+  ],
+  Transport: [
+    "Try carpooling once a week to cut emissions.",
+    "Switch short car trips to walking or cycling.",
+    "Use public transport for your daily commute when possible."
+  ],
+  Waste: [
+    "Compost food scraps to reduce landfill waste.",
+    "Avoid single-use plastics—carry a reusable bottle.",
+    "Buy in bulk to reduce packaging waste."
+  ],
+  Food: [
+    "Reduce meat intake—go meatless once a week.",
+    "Choose seasonal, local produce.",
+    "Avoid food waste by planning meals and storing properly."
+  ]
+};
+
+
 // Avatar styles for mapping avatarStyle to image
 const avatarStyles = [
   { name: 'Classic', img: '/avatars/classic.png' },
@@ -21,11 +51,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80';
 console.log("🌐 Using API_BASE_URL:", API_BASE_URL);
 
 
+
 const Dashboard = () => {
   const { currentUser } = useAuth();
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lowTipCategories, setLowTipCategories] = useState([]);
   const [carbonImpact, setCarbonImpact] = useState({
     co2Reduced: 0,
     treesEquivalent: 0,
@@ -82,7 +114,8 @@ const levelResponse = await fetch(`${API_BASE_URL}/api/users/${userId}/level-inf
         }
 
      // Fetch carbon impact from your backend
-const impactResponse = await fetch(`${API_BASE_URL}/api/users/${userId}/carbon-impact`, {
+     console.log(`👀 Hitting: ${API_BASE_URL}/api/activities/users/${userId}/carbon-impact`);
+const impactResponse = await fetch(`${API_BASE_URL}/api/activities/users/${userId}/carbon-impact`, {
   headers: { 'Authorization': `Bearer ${token}` }
 });
 if (impactResponse.ok) {
@@ -99,10 +132,18 @@ if (impactResponse.ok) {
         const statsResponse = await fetch(`${API_BASE_URL}/api/users/${userId}/activity-stats`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (statsResponse.ok) {
-          const statsData = await statsResponse.json();
-          setActivityStats(statsData);
-        }
+       if (statsResponse.ok) {
+  const statsData = await statsResponse.json();
+  setActivityStats(statsData);
+
+  // Identify lowest-logged categories
+  const sorted = statsData.categoryCounts
+    .filter(c => c && c.name)
+    .sort((a, b) => a.value - b.value);
+  const lowCategories = sorted.slice(0, 2).map(c => c.name);
+  setLowTipCategories(lowCategories);  // You need to define this state if not done yet
+}
+
 
         // Fetch points history
         const pointsResponse = await fetch(`${API_BASE_URL}/api/users/${userId}/points-history`, {
@@ -212,6 +253,27 @@ if (impactResponse.ok) {
           </div>
         </div>
       </section>
+
+      {lowTipCategories.length > 0 && (
+  <section className="tips-section">
+    <div className="section-header">
+      <h3>Personalised Sustainability Tips</h3>
+    </div>
+    <div className="tips-container">
+      {lowTipCategories.map((category, idx) => (
+        <div key={idx} className="tip-card">
+          <h4>{category} Tips</h4>
+          <ul>
+            {(tipsByCategory[category] || []).slice(0, 2).map((tip, i) => (
+              <li key={i}>🌱 {tip}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
+
 
       {/* Progress Charts Section */}
       <section className="progress-section">

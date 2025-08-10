@@ -333,334 +333,163 @@ public class ActivitiesController : ControllerBase
         }
     }
 
-    // POST: api/activities/{id}/complete
-    [HttpPost("{id}/complete")]
-    [RequestSizeLimit(10 * 1024 * 1024)] // Limit to 10MB
-    [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
-    public async Task<IActionResult> CompleteActivity(int id, [FromForm] ActivityCompletionDto completionData)
+// POST: api/activities/{id}/complete
+[HttpPost("{id}/complete")]
+[RequestSizeLimit(10 * 1024 * 1024)]
+[RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
+public async Task<IActionResult> CompleteActivity(int id, [FromForm] ActivityCompletionDto completionData)
+{
+    try
     {
-        try
+        _logger.LogInformation("⏳ Starting activity completion for ActivityId: {ActivityId}", id);
+
+        // Model validation
+        if (!ModelState.IsValid)
         {
-            if (completionData == null)
-            {
-                _logger.LogWarning("Received null completionData for activity {Id}", id);
-                return BadRequest(new { message = "Invalid or missing activity completion data." });
-            }
+            var errs = ModelState
+                .Where(kv => kv.Value?.Errors.Count > 0)
+                .ToDictionary(kv => kv.Key, kv => kv.Value!.Errors.Select(e => e.ErrorMessage).ToArray());
 
-
-            _logger.LogInformation("Marking activity {Id} as completed for user {UserId}", id, completionData.UserId);
-            
-            // Get activity data using direct SQL
-            var activityQuery = "SELECT id, pointsvalue FROM sustainableactivities WHERE id = @id";
-            var activityParam = new NpgsqlParameter("id", id);
-
-            var activity = await _context.SustainableActivities
-                .AsNoTracking()
-                .FirstOrDefaultAsync(a => a.Id == id);
-
-            // 1. Define category-to-activity_id mappings
-var emissionMappings = new Dictionary<string, (string activityId, string unitType, string unit, Func<double, double>)>
-{
-    ["energy"] = ("electricity-supply_grid-source_supplier_mix", "energy", "kWh", v => v),
-    ["water"] = ("water_supply-type_na", "volume", "m3", v => v / 1000), // L to m³
-    ["waste"] = ("waste_type_mixed-disposal_landfill", "weight", "kg", v => v),
-    ["transportation"] = ("passenger_vehicle-vehicle_type_car-fuel_source_petrol-distance_na-vehicle_age_na", "distance", "km", v => v),
-    ["food"] = ("food_product-type_uk_average_diet", "mass", "kg", v => v)
-};
-
-
-// 2. Prepare the CO₂e default
-double co2e = 0;
-
-// Normalize category before matching
-string normalizedCategory = activity.Category?.ToLowerInvariant().Trim();
-
-if (normalizedCategory.Contains("energy"))
-    normalizedCategory = "energy";
-else if (normalizedCategory.Contains("water"))
-    normalizedCategory = "water";
-else if (normalizedCategory.Contains("transport"))
-    normalizedCategory = "transportation";
-else if (normalizedCategory.Contains("waste"))
-    normalizedCategory = "waste";
-else if (normalizedCategory.Contains("food"))
-    normalizedCategory = "food";
-
-if (completionData.Quantity != null && completionData.Quantity > 0)
-{
-    _logger.LogInformation("Quantity submitted: {Quantity}", completionData.Quantity);
-    co2e = await _climatiqService.CalculateCo2Async(normalizedCategory, completionData.Quantity.Value);
-    _logger.LogInformation("Fetched CO2e via ClimatiqService: {co2e} for category '{category}'", co2e, normalizedCategory);
-}
-
-
-else
-{
-    _logger.LogWarning("Unsupported category for CO2 calculation: {Category}", activity.Category);
-}
-
-
-
-            if (activity == null)
-            {
-                _logger.LogWarning("Activity {Id} not found during completion attempt", id);
-                return NotFound(new { message = $"Activity with ID {id} not found" });
-            }
-
-
-            // Get the user with a direct query
-            var userQuery = "SELECT id, points, currentstreak, maxstreak, \"Level\" FROM users WHERE id = @userId";
-            var userParam = new NpgsqlParameter("userId", completionData.UserId);
-            
-            var user = await _context.Users
-    .Where(u => u.Id == completionData.UserId)
-    .Select(u => new { u.Id, u.Points, u.CurrentStreak, u.MaxStreak, u.Level })
-    .AsNoTracking()
-    .FirstOrDefaultAsync();
-                
-            if (user == null)
-            {
-                _logger.LogWarning("User {UserId} not found during activity completion", completionData.UserId);
-                return NotFound(new { message = $"User with ID {completionData.UserId} not found" });
-            }
-
-            // Check if already completed today
-            var today = DateTime.UtcNow.Date;
-            var checkCompletedQuery = @"
-                SELECT COUNT(*) FROM activitycompletions 
-                WHERE userid = @userId AND activityid = @activityId AND 
-                      completedat >= @startDate AND completedat < @endDate";
-                      
-            var checkParams = new[]
-            {
-                new NpgsqlParameter("userId", completionData.UserId),
-                new NpgsqlParameter("activityId", id),
-                new NpgsqlParameter("startDate", today),
-                new NpgsqlParameter("endDate", today.AddDays(1))
-            };
-            
-            var completionCount = await _context.Database
-                .ExecuteSqlRawAsync(checkCompletedQuery, checkParams);
-                
-            if (completionCount > 0)
-            {
-                _logger.LogInformation("Activity {Id} already completed by user {UserId} today", id, completionData.UserId);
-                return BadRequest(new { message = "Activity already completed today" });
-            }
-
-            // Handle image upload if provided
-            string imageFileName = null;
-            if (completionData.Image != null && completionData.Image.Length > 0)
-            {
-                // Generate a unique filename with timestamp
-                var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
-                var fileExtension = Path.GetExtension(completionData.Image.FileName);
-                imageFileName = $"activity_{id}_user_{completionData.UserId}_{timestamp}{fileExtension}";
-                
-                // Create uploads directory if it doesn't exist
-                var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
-                if (!Directory.Exists(uploadsDir))
-                {
-                    Directory.CreateDirectory(uploadsDir);
-                }
-                
-                // Save the file
-                var filePath = Path.Combine(uploadsDir, imageFileName);
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await completionData.Image.CopyToAsync(stream);
-                }
-                
-                _logger.LogInformation("Saved image {ImageFileName} for activity completion", imageFileName);
-            }
-
-            // Insert completion record
-            var completedAt = completionData.CompletedAt != null 
-                ? DateTime.SpecifyKind(completionData.CompletedAt.Value, DateTimeKind.Utc) 
-                : DateTime.UtcNow;
-            
-            // Ensure the table has the necessary columns
-            try
-            {
-                // Check if the columns exist before trying to add them
-                var checkColumnsQuery = @"
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'activitycompletions' 
-                      AND column_name IN ('imagepath', 'notes', 'reviewstatus')";
-                
-                var existingColumns = await _context.Database
-                    .SqlQueryRaw<string>(checkColumnsQuery)
-                    .ToListAsync();
-                    
-                if (!existingColumns.Contains("imagepath"))
-                {
-                    await _context.Database.ExecuteSqlRawAsync(
-                        "ALTER TABLE activitycompletions ADD COLUMN imagepath text");
-                }
-                
-                if (!existingColumns.Contains("notes"))
-                {
-                    await _context.Database.ExecuteSqlRawAsync(
-                        "ALTER TABLE activitycompletions ADD COLUMN notes text");
-                }
-                
-                if (!existingColumns.Contains("reviewstatus"))
-                {
-                    await _context.Database.ExecuteSqlRawAsync(
-                        "ALTER TABLE activitycompletions ADD COLUMN reviewstatus varchar(20) DEFAULT 'Pending Review'");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Error checking/adding columns to activitycompletions table. " +
-                    "This is expected if columns already exist");
-                // Continue anyway - if columns exist, this is fine
-            }
-
-            // Insert completion record with all fields
-            var insertSql = @"
-INSERT INTO activitycompletions (userid, activityid, completedat, ""ImagePath"", ""Notes"", ""ReviewStatus"", pointsearned, co2e_reduction, ""Quantity"") 
-VALUES (@userId, @activityId, @completedAt, @imagePath, @notes, @reviewStatus, @pointsEarned, @co2eReduction, @quantity)";
-
-            var insertParams = new[]
-            {
-                new NpgsqlParameter("userId", completionData.UserId),
-                new NpgsqlParameter("activityId", id),
-                new NpgsqlParameter("completedAt", completedAt),
-                new NpgsqlParameter("imagePath", imageFileName ?? (object)DBNull.Value),
-                new NpgsqlParameter("notes", completionData.Notes ?? (object)DBNull.Value),
-                new NpgsqlParameter("reviewStatus", "Pending Review"),
-                new NpgsqlParameter("pointsEarned", activity.PointsValue),
-                new NpgsqlParameter("co2eReduction", co2e),
-                new NpgsqlParameter("quantity", completionData.Quantity ?? (object)DBNull.Value)
-
-            };
-            
-            await _context.Database.ExecuteSqlRawAsync(insertSql, insertParams);
-
-            // Check for streak updates
-            var yesterday = today.AddDays(-1);
-            var checkYesterdayQuery = @"
-                SELECT COUNT(*) FROM activitycompletions 
-                WHERE userid = @userId AND 
-                      completedat >= @startDate AND completedat < @endDate";
-                      
-            var yesterdayParams = new[]
-            {
-                new NpgsqlParameter("userId", completionData.UserId),
-                new NpgsqlParameter("startDate", yesterday),
-                new NpgsqlParameter("endDate", today)
-            };
-            
-            var yesterdayCount = await _context.Database
-                .ExecuteSqlRawAsync(checkYesterdayQuery, yesterdayParams);
-            
-            // Calculate streak
-            int newStreak = 1;
-            if (yesterdayCount > 0)
-            {
-                newStreak = user.CurrentStreak + 1;
-            }
-            
-            int newMaxStreak = Math.Max(newStreak, user.MaxStreak);
-            int newPoints = user.Points + activity.PointsValue;
-            
-            // Calculate the new level based on points thresholds
-            int newLevel = user.Level;
-            bool LeveledUp = false;
-            
-            // Level thresholds
-            if (newPoints >= 1000 && user.Level < 4)
-            {
-                newLevel = 4;
-                LeveledUp = newLevel > user.Level;
-            }
-            else if (newPoints >= 500 && user.Level < 3)
-            {
-                newLevel = 3;
-                LeveledUp = newLevel > user.Level;
-            }
-            else if (newPoints >= 250 && user.Level < 2)
-            {
-                newLevel = 2;
-                LeveledUp = newLevel > user.Level;
-            }
-            else if (newPoints >= 100 && user.Level < 1)
-            {
-                newLevel = 1;
-                LeveledUp = newLevel > user.Level;
-            }
-            
-            // Update user stats with direct SQL - now including level
-            var updateUserSql = @"
-                UPDATE users 
-                SET points = @points, 
-                    currentstreak = @currentStreak, 
-                    maxstreak = @maxStreak, 
-                    lastactivitydate = @lastActivityDate,
-                    ""Level"" = @Level
-                WHERE id = @userId";
-                
-            var updateParams = new[]
-            {
-                new NpgsqlParameter("points", newPoints),
-                new NpgsqlParameter("currentStreak", newStreak),
-                new NpgsqlParameter("maxStreak", newMaxStreak),
-                new NpgsqlParameter("lastActivityDate", DateTime.UtcNow),
-                new NpgsqlParameter("Level", newLevel),
-                new NpgsqlParameter("userId", completionData.UserId)
-            };
-            
-            await _context.Database.ExecuteSqlRawAsync(updateUserSql, updateParams);
-
-            // Return the URL for the uploaded image if available
-            string imageUrl = null;
-            if (!string.IsNullOrEmpty(imageFileName))
-            {
-                // Construct a URL to access the image
-                imageUrl = $"{Request.Scheme}://{Request.Host}/uploads/{imageFileName}";
-            }
-
-            // Calculate points needed for next level
-            int pointsToNextLevel = 0;
-            if (newLevel < 4)
-            {
-                // Calculate points needed for next level
-                if (newLevel == 1)
-                    pointsToNextLevel = 250 - newPoints;
-                else if (newLevel == 2)
-                    pointsToNextLevel = 500 - newPoints;
-                else if (newLevel == 3)
-                    pointsToNextLevel = 1000 - newPoints;
-            }
-
-            return Ok(new { 
-                message = "Activity completed successfully", 
-                pointsEarned = activity.PointsValue,
-                currentStreak = newStreak,
-                totalPoints = newPoints,
-                imageUrl = imageUrl,
-                reviewStatus = "Pending Review",
-                Level = newLevel,
-                LeveledUp = LeveledUp,
-                pointsToNextLevel = pointsToNextLevel,
-                co2eReduction = co2e 
-            });
+            return BadRequest(new { message = "Validation failed", errors = errs });
         }
-        catch (Exception ex)
+
+        // File checks
+        if (completionData.Image == null || completionData.Image.Length == 0)
+            return BadRequest(new { message = "Image is required" });
+
+        if (!completionData.Image.ContentType.StartsWith("image/"))
+            return BadRequest(new { message = "Only image files are allowed" });
+
+        const long maxBytes = 10 * 1024 * 1024; // 10MB
+        if (completionData.Image.Length > maxBytes)
+            return BadRequest(new { message = "Image must be 10MB or smaller" });
+
+        _logger.LogInformation("📦 CompletionData received: UserId={UserId}, Quantity={Quantity}, Notes={Notes}",
+            completionData.UserId, completionData.Quantity, completionData.Notes);
+
+        var activity = await _context.SustainableActivities
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == id);
+
+        if (activity == null)
         {
-            // Log the full exception details including inner exceptions
-            var fullError = ex.ToString();
-            _logger.LogError(ex, "Error occurred while completing activity {Id}: {ErrorMessage}\nFull error: {FullError}", 
-                id, ex.Message, fullError);
-            return StatusCode(500, new { 
-                message = $"An error occurred while completing the activity", 
-                error = ex.Message,
-                details = ex.InnerException?.Message
-            });
+            _logger.LogWarning("❌ Activity with ID {ActivityId} not found", id);
+            return NotFound(new { message = $"Activity with ID {id} not found" });
         }
+
+        var matchedCategory = _climatiqService.GetMatchedCategory(activity.Category);
+        _logger.LogInformation("🧽 Raw category: {Raw} → Matched Category: {Matched}", activity.Category, matchedCategory ?? "none");
+
+        // CO₂e calc (Quantity is required and > 0 due to [Range])
+        double co2e = 0;
+        if (!string.IsNullOrEmpty(matchedCategory))
+        {
+            co2e = await _climatiqService.CalculateCo2Async(matchedCategory, completionData.Quantity!.Value);
+            _logger.LogInformation("✅ Climatiq CO₂e response: {co2e} for category '{category}'", co2e, matchedCategory);
+        }
+        else
+        {
+            _logger.LogWarning("⚠️ Category '{Raw}' not recognized for CO₂e calculation", activity.Category);
+        }
+
+        var user = await _context.Users
+            .Where(u => u.Id == completionData.UserId)
+            .Select(u => new { u.Id, u.Points, u.CurrentStreak, u.MaxStreak, u.Level })
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
+
+        if (user == null)
+        {
+            _logger.LogWarning("❌ User with ID {UserId} not found", completionData.UserId);
+            return NotFound(new { message = $"User with ID {completionData.UserId} not found" });
+        }
+
+        // prevent duplicate for same day
+        var today = DateTime.UtcNow.Date;
+        var alreadyCompleted = await _context.ActivityCompletions.AnyAsync(ac =>
+            ac.UserId == completionData.UserId &&
+            ac.ActivityId == id &&
+            ac.CompletedAt >= today &&
+            ac.CompletedAt < today.AddDays(1));
+
+        if (alreadyCompleted)
+        {
+            _logger.LogInformation("🚫 Activity already completed today by user {UserId}", completionData.UserId);
+            return BadRequest(new { message = "Activity already completed today" });
+        }
+
+        // Save image
+        string imageFileName = null;
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
+        var fileExtension = Path.GetExtension(completionData.Image.FileName);
+        imageFileName = $"activity_{id}_user_{completionData.UserId}_{timestamp}{fileExtension}";
+        var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+        if (!Directory.Exists(uploadsDir))
+            Directory.CreateDirectory(uploadsDir);
+        var filePath = Path.Combine(uploadsDir, imageFileName);
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await completionData.Image.CopyToAsync(stream);
+        }
+        _logger.LogInformation("📸 Image saved as {ImageFileName}", imageFileName);
+
+        // CompletedAt
+        var completedAt = completionData.CompletedAt != null
+            ? DateTime.SpecifyKind(completionData.CompletedAt.Value, DateTimeKind.Utc)
+            : DateTime.UtcNow;
+
+        _logger.LogInformation("📝 Inserting completion record into DB...");
+
+        // Points at submission time = 0 (awarded on approval based on CO₂e)
+        var insertSql = @"
+            INSERT INTO activitycompletions (
+                userid, activityid, completedat, imagepath, notes, 
+                reviewstatus, pointsearned, co2e_reduction, ""Quantity"")
+            VALUES (
+                @userId, @activityId, @completedAt, @imagePath, @notes, 
+                @reviewStatus, @pointsEarned, @co2eReduction, @Quantity)";
+
+        var insertParams = new[]
+        {
+            new NpgsqlParameter("userId", completionData.UserId),
+            new NpgsqlParameter("activityId", id),
+            new NpgsqlParameter("completedAt", completedAt),
+            new NpgsqlParameter("imagePath", imageFileName),
+            new NpgsqlParameter("notes", (object?)completionData.Notes ?? DBNull.Value),
+            new NpgsqlParameter("reviewStatus", "Pending Review"),
+            new NpgsqlParameter("pointsEarned", (object)0), // ← important: no points yet
+            new NpgsqlParameter("co2eReduction", co2e),
+            new NpgsqlParameter("Quantity", completionData.Quantity!.Value)
+        };
+
+        await _context.Database.ExecuteSqlRawAsync(insertSql, insertParams);
+
+        _logger.LogInformation("✅ Activity completed and saved successfully for user {UserId}", completionData.UserId);
+
+        string imageUrl = $"{Request.Scheme}://{Request.Host}/uploads/{imageFileName}";
+
+        return Ok(new
+        {
+            message = "Activity submitted for review",
+            reviewStatus = "Pending Review",
+            imageUrl,
+            co2eReduction = co2e
+        });
     }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "❌ Error during activity completion: {ErrorMessage}", ex.Message);
+        return StatusCode(500, new
+        {
+            message = "An error occurred while completing the activity",
+            error = ex.Message,
+            details = ex.InnerException?.Message
+        });
+    }
+}
+
+
+
 
     // GET: api/activities/completed/{userId}
     [HttpGet("completed/{userId}")]
@@ -674,7 +503,7 @@ VALUES (@userId, @activityId, @completedAt, @imagePath, @notes, @reviewStatus, @
             var sql = @"
             SELECT ac.id, ac.userid, ac.activityid, ac.completedat,
        ac.imagepath, ac.notes, ac.reviewstatus, ac.pointsearned,
-       ac.quantity, ac.co2e_reduction,  
+       ac.Quantity, ac.co2e_reduction,  
        sa.id AS activity_id, sa.title AS activity_title, 
        sa.description AS activity_description, sa.pointsvalue AS activity_pointsvalue
 FROM activitycompletions ac
@@ -731,7 +560,7 @@ JOIN sustainableactivities sa ON ac.activityid = sa.id
                             pointsEarned = reader.GetInt32(reader.GetOrdinal("pointsearned")),
 
                             // ✅ NEW FIELDS
-                            quantity = reader.IsDBNull(reader.GetOrdinal("quantity")) ? 0.0 : reader.GetDouble(reader.GetOrdinal("quantity")),
+                            Quantity = reader.IsDBNull(reader.GetOrdinal("Quantity")) ? 0.0 : reader.GetDouble(reader.GetOrdinal("Quantity")),
                             co2eReduction = reader.IsDBNull(reader.GetOrdinal("co2e_reduction")) ? 0.0 : reader.GetDouble(reader.GetOrdinal("co2e_reduction")),
 
                             activity = new
@@ -932,117 +761,76 @@ JOIN sustainableactivities sa ON ac.activityid = sa.id
     // Admin endpoint to review activity completions
     [HttpPatch("review/{completionId}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> ReviewActivityCompletion(int completionId, [FromBody] ActivityReviewDto reviewData)
+public async Task<IActionResult> ReviewActivityCompletion(int completionId, [FromBody] ActivityReviewDto reviewData)
+{
+    try
     {
-        try
+        _logger.LogInformation("Admin reviewing activity completion {CompletionId}", completionId);
+
+        var completion = await _context.ActivityCompletions
+            .FirstOrDefaultAsync(ac => ac.Id == completionId);
+
+        if (completion == null)
         {
-            _logger.LogInformation("Admin reviewing activity completion {CompletionId}", completionId);
-            
-            // Check if completion exists
-            var completionQuery = @"
-                SELECT id, userid, activityid, reviewstatus, pointsearned 
-                FROM activitycompletions 
-                WHERE id = @completionId";
-                
-            var completionParam = new NpgsqlParameter("completionId", completionId);
-            
-            // Get the completion record
-            ActivityCompletion completion = null;
-            using (var command = _context.Database.GetDbConnection().CreateCommand())
-            {
-                command.CommandText = completionQuery;
-                command.Parameters.Add(completionParam);
-
-                if (command.Connection.State != System.Data.ConnectionState.Open)
-                {
-                    command.Connection.Open();
-                }
-
-                using (var reader = await command.ExecuteReaderAsync())
-                {
-                    if (await reader.ReadAsync())
-                    {
-                        completion = new ActivityCompletion
-                        {
-                            Id = reader.GetInt32(reader.GetOrdinal("id")),
-                            UserId = reader.GetInt32(reader.GetOrdinal("userid")),
-                            ActivityId = reader.GetInt32(reader.GetOrdinal("activityid")),
-                            ReviewStatus = reader.IsDBNull(reader.GetOrdinal("reviewstatus")) 
-                                ? "Pending Review" 
-                                : reader.GetString(reader.GetOrdinal("reviewstatus")),
-                            PointsEarned = reader.GetInt32(reader.GetOrdinal("pointsearned"))
-                        };
-                    }
-                }
-            }
-            
-            if (completion == null)
-            {
-                _logger.LogWarning("Activity completion with ID {CompletionId} not found", completionId);
-                return NotFound(new { message = $"Activity completion with ID {completionId} not found" });
-            }
-            
-            // Update the review status
-            var updateSql = @"
-                UPDATE activitycompletions 
-                SET reviewstatus = @reviewStatus, 
-                    adminnotes = @adminNotes
-                WHERE id = @completionId";
-                
-            var updateParams = new[]
-            {
-                new NpgsqlParameter("reviewStatus", reviewData.Status),
-                new NpgsqlParameter("adminNotes", reviewData.AdminNotes ?? (object)DBNull.Value),
-                new NpgsqlParameter("completionId", completionId)
-            };
-            
-            await _context.Database.ExecuteSqlRawAsync(updateSql, updateParams);
-            
-            // If the status is "Rejected", remove the points from the user
-            if (reviewData.Status == "Rejected")
-            {
-                // Get the user's current points
-                var userQuery = "SELECT id, points FROM users WHERE id = @userId";
-                var userParam = new NpgsqlParameter("userId", completion.UserId);
-                
-                var user = await _context.Users
-                    .FromSqlRaw(userQuery, userParam)
-                    .Select(u => new { u.Id, u.Points })
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync();
-                    
-                if (user != null)
-                {
-                    // Deduct the points
-                    var newPoints = Math.Max(0, user.Points - completion.PointsEarned); // Ensure points don't go below 0
-                    
-                    // Update user points
-                    var updateUserSql = "UPDATE users SET points = @points WHERE id = @userId";
-                    var updateUserParams = new[]
-                    {
-                        new NpgsqlParameter("points", newPoints),
-                        new NpgsqlParameter("userId", completion.UserId)
-                    };
-                    
-                    await _context.Database.ExecuteSqlRawAsync(updateUserSql, updateUserParams);
-                }
-            }
-
-            return Ok(new { 
-                message = $"Activity completion reviewed successfully. Status: {reviewData.Status}",
-                completionId = completionId,
-                status = reviewData.Status
-            });
+            _logger.LogWarning("Completion ID {CompletionId} not found", completionId);
+            return NotFound(new { message = $"Completion with ID {completionId} not found" });
         }
-        catch (Exception ex)
+
+        completion.ReviewStatus = reviewData.Status;
+        completion.AdminNotes = reviewData.AdminNotes;
+
+        if (reviewData.Status == "Approved")
         {
-            _logger.LogError(ex, "Error occurred while reviewing activity completion {CompletionId}", completionId);
-            return StatusCode(500, new { 
-                message = $"An error occurred while reviewing the activity completion", 
-                error = ex.Message
-            });
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == completion.UserId);
+            if (user != null)
+            {
+                // Points from CO₂e only (no fallback)
+                var co2 = completion.Co2eReduction ?? 0;
+                var earnedPoints = (int)Math.Round(co2 * 100.0, MidpointRounding.AwayFromZero); // 1 pt / 0.01 kg
+
+                completion.PointsEarned = earnedPoints;
+                user.Points += earnedPoints;
+
+                // Streak logic (unchanged)
+                var today = DateTime.UtcNow.Date;
+                var yesterday = today.AddDays(-1);
+                var hadActivityYesterday = await _context.ActivityCompletions.AnyAsync(ac =>
+                    ac.UserId == user.Id &&
+                    ac.ReviewStatus == "Approved" &&
+                    ac.CompletedAt >= yesterday &&
+                    ac.CompletedAt < today
+                );
+
+                int newStreak = hadActivityYesterday ? user.CurrentStreak + 1 : 1;
+                user.CurrentStreak = newStreak;
+                user.MaxStreak = Math.Max(user.MaxStreak, newStreak);
+                user.LastActivityDate = DateTime.UtcNow;
+
+                // Optional: keep your existing level logic, or switch levels to be based on total points
+                _context.Users.Update(user);
+            }
         }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            id = completion.Id,
+            userId = completion.UserId,
+            activityId = completion.ActivityId,
+            status = reviewData.Status,
+            adminNotes = reviewData.AdminNotes,
+            pointsEarned = completion.PointsEarned
+        });
     }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error reviewing activity completion {CompletionId}", completionId);
+        return StatusCode(500, new { message = "Error reviewing activity", error = ex.Message });
+    }
+}
+
+
 
   [HttpGet("users/{userId}/carbon-impact")]
 public async Task<IActionResult> GetCarbonImpact(int userId)

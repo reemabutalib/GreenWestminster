@@ -14,15 +14,29 @@ namespace Server.Services.Implementations
         private readonly string _dataVersion = "24.24"; // required
 
         private readonly Dictionary<string, (string activityId, string unitType, string unit, Func<double, double> convert)> _emissionMappings =
-    new()
-    {
-        ["energy"] = ("electricity-energy_source_grid_mix", "energy", "kWh", v => v),
-        ["water"] = ("water-supply_treatment-distribution", "volume", "l", v => v),         // 🔁 no conversion
-        ["waste"] = ("waste-disposal_landfill-mixed_municipal_solid", "weight", "kg", v => v),
-        ["transportation"] = ("passenger_vehicle-vehicle_type_car-fuel_source_petrol-engine_size_medium-vehicle_age_na", "distance", "km", v => v),
-        ["food"] = ("food-supply_beef-farming_method_na-region_europe", "weight", "kg", v => v)
-    };
+            new()
+            {
+                ["energy"] = ("electricity-energy_source_grid_mix", "energy", "kWh", v => v),
+                ["water"] = ("water-supply_treatment-distribution", "volume", "m3", v => v / 1000), // liters → m3
+                ["waste"] = ("waste-type_aggregates-disposal_method_landfill", "weight", "kg", v => v),
+                ["transportation"] = ("managed_assets_vehicle-vehicle_type_business_travel_car-fuel_source_petrol-engine_size_na-vehicle_age_na-vehicle_weight_na", "distance", "km", v => v),
+                ["food"] = ("food-supply_beef-farming_method_na-region_europe", "weight", "kg", v => v)
+            };
+public string GetMatchedCategory(string rawCategory)
+{
+    if (string.IsNullOrWhiteSpace(rawCategory))
+        return null;
 
+    var normalized = rawCategory.ToLowerInvariant();
+
+    if (normalized.Contains("energy")) return "energy";
+    if (normalized.Contains("water")) return "water";
+    if (normalized.Contains("transport")) return "transportation";
+    if (normalized.Contains("waste")) return "waste";
+    if (normalized.Contains("food")) return "food";
+
+    return null;
+}
 
         public ClimatiqService(HttpClient httpClient, IConfiguration config)
         {

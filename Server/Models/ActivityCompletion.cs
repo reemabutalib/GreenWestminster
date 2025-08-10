@@ -15,6 +15,7 @@ public class ActivityCompletion
     public string Notes { get; set; }
     public string ReviewStatus { get; set; } = "Pending Review";
     public double? Quantity { get; set; }  // optional quantity in appropriate units
+    public string? AdminNotes { get; set; }
 
     [Column("co2e_reduction")]
     public double? Co2eReduction { get; set; }

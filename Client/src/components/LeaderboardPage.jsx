@@ -18,8 +18,11 @@ const LeaderboardPage = () => {
       
       try {
         // URL includes timeFrame as a query parameter
-        const url = `http://localhost:80/api/users/leaderboard?timeFrame=${timeFrame}`;
-        const response = await fetch(url);
+        const API_URL = import.meta.env.VITE_API_URL || '';
+        const url = `${API_URL}/api/users/leaderboard?timeFrame=${timeFrame}`;
+
+const response = await fetch(url);
+
         
         if (!response.ok) {
           throw new Error(`Failed to fetch leaderboard data: ${response.status}`);

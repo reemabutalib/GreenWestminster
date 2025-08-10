@@ -140,3 +140,22 @@
     font-size: 1.1rem;
   }
 }
+
+.pending-status {
+  position: absolute;
+  top: 0.25rem;
+  left: 0.25rem;
+  background-color: #fff8e1;
+  color: #fbc02d;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.activity-card.completed {
+  background-color: #fffde7;
+  border: 1px solid #fbc02d;
+}
+

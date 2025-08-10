@@ -23,6 +23,7 @@ import ManageActivities from './components/admin/ManageActivities';
 import ManageEvents from './components/admin/ManageEvents';
 import ManageChallenges from './components/admin/ManageChallenges';
 import AdminLogin from './components/admin/AdminLogin';
+import ReviewSubmissions from './components/admin/ReviewSubmissions';
 
 // Import auth context
 import { AuthProvider, useAuth } from './components/context/UserContext';
@@ -119,6 +120,7 @@ function AppContent() {
               <Route path="activities" element={<ManageActivities />} />
               <Route path="events" element={<ManageEvents />} />
               <Route path="challenges" element={<ManageChallenges />} />
+              <Route path="review" element={<ReviewSubmissions />} />
             </Route>
           </Routes>
         </main>

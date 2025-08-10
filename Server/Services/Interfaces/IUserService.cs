@@ -11,7 +11,6 @@ namespace Server.Services.Interfaces
         Task<IEnumerable<User>> GetUsersAsync();
         Task<User?> GetUserAsync(int id);
         Task<User> CreateUserAsync(User user);
-        Task<IEnumerable<User>> GetLeaderboardAsync(string timeFrame);
         Task<object?> GetUserStatsAsync(int id);
         Task<IEnumerable<object>> GetRecentActivitiesAsync(int id);
         Task<IEnumerable<object>> GetCompletedActivitiesAsync(int id, DateTime date);
@@ -23,5 +22,7 @@ namespace Server.Services.Interfaces
         Task<object> AddPointsAsync(int userId, int points);
         Task<object?> GetLevelInfoAsync(int userId);
         Task<bool> UpdateAvatarAsync(int userId, string avatarStyle);
+        Task<IEnumerable<LeaderboardUserDto>> GetLeaderboardAsync(string timeFrame);
+
     }
 }
