@@ -3,7 +3,6 @@ import axios from 'axios';
 
 const ManageChallenges = () => {
   const [challenges, setChallenges] = useState([]);
-  const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingChallenge, setEditingChallenge] = useState(null);
@@ -12,29 +11,20 @@ const ManageChallenges = () => {
     description: '',
     startDate: '',
     endDate: '',
-    pointsTarget: 0,
-    activityIds: []
+    pointsReward: 0
   });
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
-      const [challengesResponse, activitiesResponse] = await Promise.all([
-        axios.get('http://localhost:80/api/challenges', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get('http://localhost:80/api/activities', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-      ]);
-      
-      setChallenges(challengesResponse.data);
-      setActivities(activitiesResponse.data);
+      const response = await axios.get('http://localhost:80/api/challenges', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setChallenges(response.data);
       setError(null);
     } catch (err) {
-      setError('Failed to fetch data');
+      setError('Failed to fetch challenges');
       console.error(err);
     } finally {
       setLoading(false);
@@ -47,20 +37,10 @@ const ManageChallenges = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type } = e.target;
-    
-    if (name === 'activityIds') {
-      // Handle multiple select
-      const selectedOptions = Array.from(e.target.selectedOptions, option => parseInt(option.value));
-      setFormData({
-        ...formData,
-        activityIds: selectedOptions
-      });
-    } else {
-      setFormData({
-        ...formData,
-        [name]: type === 'number' ? parseInt(value) : value
-      });
-    }
+    setFormData({
+      ...formData,
+      [name]: type === 'number' ? parseInt(value) : value
+    });
   };
 
   const handleAddChallenge = async (e) => {
@@ -73,15 +53,12 @@ const ManageChallenges = () => {
           Authorization: `Bearer ${token}`
         }
       });
-      
-      // Reset form and refresh challenges
       setFormData({
         title: '',
         description: '',
         startDate: '',
         endDate: '',
-        pointsTarget: 0,
-        activityIds: []
+        pointsReward: 0
       });
       fetchData();
     } catch (err) {
@@ -92,19 +69,15 @@ const ManageChallenges = () => {
 
   const handleEditChallenge = (challenge) => {
     setEditingChallenge(challenge.id);
-    
-    // Format dates for form inputs
     const startDate = challenge.startDate ? new Date(challenge.startDate).toISOString().slice(0, 10) : '';
     const endDate = challenge.endDate ? new Date(challenge.endDate).toISOString().slice(0, 10) : '';
-    
     setFormData({
       id: challenge.id,
       title: challenge.title,
       description: challenge.description,
       startDate: startDate,
       endDate: endDate,
-      pointsTarget: challenge.pointsTarget,
-      activityIds: challenge.activities ? challenge.activities.map(a => a.id) : []
+      pointsTarget: challenge.pointsReward
     });
   };
 
@@ -118,16 +91,13 @@ const ManageChallenges = () => {
           Authorization: `Bearer ${token}`
         }
       });
-      
-      // Reset editing state and refresh challenges
       setEditingChallenge(null);
       setFormData({
         title: '',
         description: '',
         startDate: '',
         endDate: '',
-        pointsTarget: 0,
-        activityIds: []
+        pointsReward: 0
       });
       fetchData();
     } catch (err) {
@@ -140,7 +110,6 @@ const ManageChallenges = () => {
     if (!window.confirm('Are you sure you want to delete this challenge?')) {
       return;
     }
-    
     try {
       const token = localStorage.getItem('token');
       await axios.delete(`http://localhost:80/api/challenges/${id}`, {
@@ -160,17 +129,14 @@ const ManageChallenges = () => {
       description: '',
       startDate: '',
       endDate: '',
-      pointsTarget: 0,
-      activityIds: []
+      pointsReward: 0
     });
   };
 
   return (
     <div className="manage-challenges">
       <h2>{editingChallenge ? 'Edit Challenge' : 'Add New Challenge'}</h2>
-      
       {error && <div className="error-message">{error}</div>}
-      
       <form onSubmit={editingChallenge ? handleUpdateChallenge : handleAddChallenge} className="form-section">
         <div className="form-group">
           <label htmlFor="title">Title</label>
@@ -184,7 +150,6 @@ const ManageChallenges = () => {
             required
           />
         </div>
-        
         <div className="form-group">
           <label htmlFor="description">Description</label>
           <textarea
@@ -197,7 +162,6 @@ const ManageChallenges = () => {
             required
           />
         </div>
-        
         <div className="form-group">
           <label htmlFor="startDate">Start Date</label>
           <input
@@ -210,7 +174,6 @@ const ManageChallenges = () => {
             required
           />
         </div>
-        
         <div className="form-group">
           <label htmlFor="endDate">End Date</label>
           <input
@@ -223,40 +186,19 @@ const ManageChallenges = () => {
             required
           />
         </div>
-        
         <div className="form-group">
-          <label htmlFor="pointsTarget">Points Target</label>
+          <label htmlFor="pointsReward">Points Target</label>
           <input
             type="number"
-            id="pointsTarget"
-            name="pointsTarget"
-            value={formData.pointsTarget}
+            id="pointsReward"
+            name="pointsReward"
+            value={formData.pointsReward}
             onChange={handleInputChange}
             className="form-control"
             min="0"
             required
           />
         </div>
-        
-        <div className="form-group">
-          <label htmlFor="activityIds">Associated Activities (Hold Ctrl/Cmd to select multiple)</label>
-          <select
-            id="activityIds"
-            name="activityIds"
-            multiple
-            value={formData.activityIds}
-            onChange={handleInputChange}
-            className="form-control"
-            size="5"
-          >
-            {activities.map(activity => (
-              <option key={activity.id} value={activity.id}>
-                {activity.title} ({activity.category}, {activity.pointsValue} pts)
-              </option>
-            ))}
-          </select>
-        </div>
-        
         <div className="form-buttons">
           {editingChallenge ? (
             <>
@@ -270,7 +212,6 @@ const ManageChallenges = () => {
           )}
         </div>
       </form>
-      
       <h2>All Challenges</h2>
       {loading ? (
         <div className="loading-container">Loading challenges...</div>
@@ -281,7 +222,6 @@ const ManageChallenges = () => {
               <th>Title</th>
               <th>Date Range</th>
               <th>Points Target</th>
-              <th>Activities</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -290,8 +230,7 @@ const ManageChallenges = () => {
               <tr key={challenge.id}>
                 <td>{challenge.title}</td>
                 <td>{new Date(challenge.startDate).toLocaleDateString()} - {new Date(challenge.endDate).toLocaleDateString()}</td>
-                <td>{challenge.pointsTarget}</td>
-                <td>{challenge.activities ? challenge.activities.length : 0}</td>
+                <td>{challenge.pointsReward}</td>
                 <td className="table-actions">
                   <button 
                     className="btn btn-secondary"

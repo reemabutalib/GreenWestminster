@@ -21,6 +21,8 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
     public DbSet<Challenge> Challenges { get; set; } = null!;
     public DbSet<UserChallenge> UserChallenges { get; set; } = null!;
     public DbSet<SustainabilityEvent> SustainabilityEvents { get; set; } = null!;
+    public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
+
 
     // Add the ConfigureConventions method to handle DateTime UTC conversion
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
@@ -95,14 +97,23 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
         });
 
         modelBuilder.Entity<ActivityCompletion>(entity =>
-        {
-            entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.UserId).HasColumnName("userid");
-            entity.Property(e => e.ActivityId).HasColumnName("activityid");
-            entity.Property(e => e.CompletedAt).HasColumnName("completedat"); // Updated property and column name
-            entity.Property(e => e.PointsEarned).HasColumnName("pointsearned");
-        });
+{
+    entity.ToTable("activitycompletions");
 
+    entity.Property(e => e.Id).HasColumnName("id");
+    entity.Property(e => e.UserId).HasColumnName("userid");
+    entity.Property(e => e.ActivityId).HasColumnName("activityid");
+    entity.Property(e => e.CompletedAt).HasColumnName("completedat");
+    entity.Property(e => e.PointsEarned).HasColumnName("pointsearned");
+
+    // 👇 important explicit mappings
+    entity.Property(e => e.ImagePath).HasColumnName("imagepath");
+    entity.Property(e => e.Notes).HasColumnName("notes");
+    entity.Property(e => e.ReviewStatus).HasColumnName("reviewstatus");
+    entity.Property(e => e.Quantity).HasColumnName("quantity");
+    entity.Property(e => e.AdminNotes).HasColumnName("adminnotes");
+    entity.Property(e => e.Co2eReduction).HasColumnName("co2e_reduction");
+});
 
         modelBuilder.Entity<SustainabilityEvent>().ToTable("sustainabilityevents");
 
@@ -129,7 +140,7 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.UserId).HasColumnName("userid");
             entity.Property(e => e.ChallengeId).HasColumnName("challengeid");
-            entity.Property(e => e.JoinedDate).HasColumnName("joineddate");
+            entity.Property(e => e.JoinedDate).HasColumnName("joindate");
             entity.Property(e => e.Completed).HasColumnName("completed");
             entity.Property(e => e.CompletedAt).HasColumnName("completedat");
             entity.Property(e => e.Progress).HasColumnName("progress");
@@ -140,6 +151,24 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
             // Ignore the CompletedDate property since it's just an alias
             entity.Ignore(u => u.CompletedDate);
         });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+{
+    entity.ToTable("refreshtokens");
+
+    entity.Property(e => e.Id).HasColumnName("id");
+    entity.Property(e => e.UserId).HasColumnName("userid");
+    entity.Property(e => e.Token).HasColumnName("token");
+    entity.Property(e => e.Expires).HasColumnName("expires");
+    entity.Property(e => e.IsRevoked).HasColumnName("isrevoked");
+    entity.Property(e => e.Created).HasColumnName("created");
+
+    entity.HasOne(e => e.User)
+        .WithMany()
+        .HasForeignKey(e => e.UserId)
+        .OnDelete(DeleteBehavior.Cascade);
+});
+
 
         // Configure User <-> ActivityCompletion relationship
         modelBuilder.Entity<ActivityCompletion>()

@@ -96,25 +96,32 @@ const AdminStats = () => {
         )}
       </div>
 
-      <div className="stats-section">
-        <h3>Points Distribution</h3>
-        {stats.pointsDistribution?.length > 0 && (
-          <Pie
-            data={{
-              labels: stats.pointsDistribution.map(d => d.pointRange),
-              datasets: [{
-                label: 'Users',
-                data: stats.pointsDistribution.map(d => d.userCount),
-                backgroundColor: [
-                  'rgba(75, 192, 192, 0.6)',
-                  'rgba(255, 206, 86, 0.6)',
-                  'rgba(153, 102, 255, 0.6)'
-                ]
-              }]
-            }}
-          />
-        )}
-      </div>
+<div className="stats-section">
+  <h3>Points Distribution</h3>
+  {stats.pointsDistribution?.length > 0 && (
+    <div style={{ maxWidth: 320, margin: '0 auto' }}>
+      <Pie
+        data={{
+          labels: stats.pointsDistribution.map(d => d.pointRange),
+          datasets: [{
+            label: 'Users',
+            data: stats.pointsDistribution.map(d => d.userCount),
+            backgroundColor: [
+              'rgba(75, 192, 192, 0.6)',
+              'rgba(255, 206, 86, 0.6)',
+              'rgba(153, 102, 255, 0.6)'
+            ]
+          }]
+        }}
+        options={{
+          maintainAspectRatio: false
+        }}
+        height={220}
+        width={320}
+      />
+    </div>
+  )}
+</div>
 
       <div className="stats-section">
         <h3>Top Users</h3>

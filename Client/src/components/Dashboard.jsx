@@ -1,16 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from './context/UserContext';
 import '../styling/Dashboard.css';
 import StreakCounter from './StreakCounter';
-import ActiveChallenges from './ActiveChallenges';
-import ActivitiesPage from './ActivitiesPage';
+
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from 'recharts';
 
-// Add this at the top, after imports
 const tipsByCategory = {
   Water: [
     "Fix leaky taps to save up to 90 liters a week.",
@@ -39,286 +37,520 @@ const tipsByCategory = {
   ]
 };
 
-
-// Avatar styles for mapping avatarStyle to image
 const avatarStyles = [
-  { name: 'Classic', img: '/avatars/classic.png' },
-  { name: 'Eco Hero', img: '/avatars/eco-hero.png' },
-  { name: 'Streak Master', img: '/avatars/streak-master.png' },
+  // Bronze
+  { name: 'Sprout Seeker', img: '/avatars/bronze-sprout-seeker.png' },
+  { name: 'Seedling Adventurer', img: '/avatars/bronze-seedling-adventurer.png' },
+  { name: 'Eco Explorer', img: '/avatars/bronze-eco-explorer.png' },
+
+  // Silver
+  { name: 'Leaf Guardian', img: '/avatars/silver-leaf-guardian.png' },
+  { name: 'Eco Pathfinder', img: '/avatars/silver-eco-pathfinder.png' },
+  { name: 'River Protector', img: '/avatars/silver-river-protector.png' },
+
+  // Gold
+  { name: 'Sunlight Steward', img: '/avatars/gold-sunlight-steward.png' },
+  { name: 'Forest Champion', img: '/avatars/gold-forest-champion.png' },
+  { name: 'Wildlife Guardian', img: '/avatars/gold-wildlife-guardian.png' },
+
+  // Platinum
+  { name: 'Planet Protector', img: '/avatars/platinum-planet-protector.png' },
+  { name: 'Harmony Keeper', img: '/avatars/platinum-harmony-keeper.png' },
+  { name: 'Gaia\'s Guardian', img: '/avatars/platinum-gaias-guardian.png' },
 ];
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80';
-console.log("🌐 Using API_BASE_URL:", API_BASE_URL);
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:80').replace(/\/$/, '');
 
+// helpers to persist dismissed approvals
+const getIdSet = (key) => {
+  try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')); }
+  catch { return new Set(); }
+};
+const setIdSet = (key, set) => localStorage.setItem(key, JSON.stringify(Array.from(set)));
+
+// neat datetime like "13 Aug 2025, 09:12"
+const formatDateTime = (d) =>
+  new Date(d).toLocaleString(undefined, {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
+
+  // toast state INSIDE component
+  const [toast, setToast] = useState(null);
+  const showToast = (msg) => {
+    setToast(msg);
+    window.clearTimeout(showToast._t);
+    showToast._t = window.setTimeout(() => setToast(null), 3000);
+  };
+
+  // core user/state
   const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lowTipCategories, setLowTipCategories] = useState([]);
-  const [carbonImpact, setCarbonImpact] = useState({
-    co2Reduced: 0,
-    treesEquivalent: 0,
-    waterSaved: 0
-  });
-  const [activityStats, setActivityStats] = useState({
-    categoryCounts: [],
-    weeklyActivity: []
-  });
-  const [pointsHistory, setPointsHistory] = useState([]);
   const [levelInfo, setLevelInfo] = useState({
-    currentLevel: 1,
+    currentLevel: "Bronze",
     pointsToNextLevel: 100,
     progressPercentage: 0,
+    nextLevel: "Silver",
     levelThresholds: [
-      { level: 1, threshold: 0 },
-      { level: 2, threshold: 100 },
-      { level: 3, threshold: 250 },
-      { level: 4, threshold: 500 },
-      { level: 5, threshold: 1000 }
+      { level: "Bronze", threshold: 0 },
+      { level: "Silver", threshold: 500 },
+      { level: "Gold", threshold: 1000 },
+      { level: "Platinum", threshold: 5000 }
     ]
   });
 
-  const COLORS = ['#4CAF50', '#8BC34A', '#CDDC39', '#FFC107', '#FF9800', '#009688'];
+  const [activityStats, setActivityStats] = useState({ categoryCounts: [], weeklyActivity: [] });
+  const [pointsHistory, setPointsHistory] = useState([]);
+  const [carbonImpact, setCarbonImpact] = useState({ co2Reduced: 0, treesEquivalent: 0, waterSaved: 0 });
 
+  // tips
+  const [lowTipCategories, setLowTipCategories] = useState([]);
+
+  // completions + reviews
+  const [pendingItems, setPendingItems] = useState([]);     // Pending Review + Rejected
+  const [allCompletions, setAllCompletions] = useState([]); // includes Approved (for notifications)
+
+  // challenges (joined by user)
+  const [userChallenges, setUserChallenges] = useState([]);
+
+  // resubmit modal
+  const [resubmitOpen, setResubmitOpen] = useState(false);
+  const [resubmitTarget, setResubmitTarget] = useState(null);
+  const [resubmitNotes, setResubmitNotes] = useState('');
+  const [resubmitFile, setResubmitFile] = useState(null);
+  const [resubmitting, setResubmitting] = useState(false);
+
+  // approved notifications (dismissible)
+  const [dismissedApproved, setDismissedApproved] = useState(() => getIdSet('approvedDismissedIds'));
+
+  // loading/error
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const token = useMemo(() => (currentUser?.token || localStorage.getItem('token') || ''), [currentUser]);
+
+  // fetch everything
   useEffect(() => {
-    const fetchUserData = async () => {
-      if (!currentUser) {
-        setLoading(false);
-        return;
-      }
-      const userId = currentUser.userId;
-      if (!userId) {
-        setError('No user ID available');
-        setLoading(false);
-        return;
-      }
-      try {
-        const token = currentUser.token || localStorage.getItem('token');
-        const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error('Failed to fetch user data');
-        const userData = await response.json();
-        setUserData({ ...userData, userId });
+    if (!currentUser) { setLoading(false); return; }
+    const userId = currentUser.userId;
+    if (!userId) { setError('No user ID available'); setLoading(false); return; }
 
-        // Fetch level info
-const levelResponse = await fetch(`${API_BASE_URL}/api/users/${userId}/level-info`, {
-  headers: { 'Authorization': `Bearer ${token}` }
-});
-        if (levelResponse.ok) {
-          const levelData = await levelResponse.json();
-          setLevelInfo(levelData);
+    const fetchAll = async () => {
+      try {
+        const authHeader = { Authorization: `Bearer ${token}` };
+
+        // user profile
+        const userRes = await fetch(`${API_BASE_URL}/api/users/${userId}`, { headers: authHeader });
+        if (!userRes.ok) throw new Error('Failed to fetch user data');
+        const user = await userRes.json();
+        setUserData({ ...user, userId });
+
+        // level
+        const levelRes = await fetch(`${API_BASE_URL}/api/users/${userId}/level-info`, { headers: authHeader });
+        if (levelRes.ok) setLevelInfo(await levelRes.json());
+
+        // carbon impact (Approved only)
+        const impactRes = await fetch(`${API_BASE_URL}/api/activities/users/${userId}/carbon-impact`, { headers: authHeader });
+        if (impactRes.ok) {
+          const impactData = await impactRes.json();
+          setCarbonImpact({
+            co2Reduced: impactData.co2Reduced?.toFixed(2) ?? 0,
+            treesEquivalent: impactData.co2Reduced ? (impactData.co2Reduced / 21).toFixed(2) : 0,
+            waterSaved: impactData.waterSaved ?? 0
+          });
         }
 
-     // Fetch carbon impact from your backend
-     console.log(`👀 Hitting: ${API_BASE_URL}/api/activities/users/${userId}/carbon-impact`);
-const impactResponse = await fetch(`${API_BASE_URL}/api/activities/users/${userId}/carbon-impact`, {
-  headers: { 'Authorization': `Bearer ${token}` }
-});
-if (impactResponse.ok) {
-  const impactData = await impactResponse.json();
-  setCarbonImpact({
-    co2Reduced: impactData.co2Reduced.toFixed(2),
-    treesEquivalent: (impactData.co2Reduced / 21).toFixed(2),
-    waterSaved: impactData.waterSaved
-  });
-}
+        // pending + rejected
+        const pendingRes = await fetch(`${API_BASE_URL}/api/activities/pending/${userId}`, { headers: authHeader });
+        if (pendingRes.ok) setPendingItems(await pendingRes.json());
 
+        // all completions (for approvals notifications)
+        const allRes = await fetch(`${API_BASE_URL}/api/activities/completed/${userId}`, { headers: authHeader });
+        if (allRes.ok) setAllCompletions(await allRes.json());
 
-        // Fetch activity stats
-        const statsResponse = await fetch(`${API_BASE_URL}/api/users/${userId}/activity-stats`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-       if (statsResponse.ok) {
-  const statsData = await statsResponse.json();
-  setActivityStats(statsData);
+        // activity stats → tips
+        const statsRes = await fetch(`${API_BASE_URL}/api/users/${userId}/activity-stats`, { headers: authHeader });
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          setActivityStats(statsData);
 
-  // Identify lowest-logged categories
-  const sorted = statsData.categoryCounts
-    .filter(c => c && c.name)
-    .sort((a, b) => a.value - b.value);
-  const lowCategories = sorted.slice(0, 2).map(c => c.name);
-  setLowTipCategories(lowCategories);  // You need to define this state if not done yet
-}
+          const allCategories = ["Water", "Energy", "Transport", "Waste", "Food"];
+          const categoryMap = {
+            "Water Conservation": "Water",
+            "Energy Saving": "Energy",
+            "Transportation": "Transport",
+            "Waste Reduction": "Waste",
+            "Food Choices": "Food"
+          };
+          const mergedCategoryCounts = allCategories.map(cat => {
+            const match = statsData.categoryCounts.find(
+              c => categoryMap[c.name] === cat || c.name === cat
+            );
+            return { name: cat, value: match ? match.value : 0 };
+          });
+          const sorted = mergedCategoryCounts.sort((a, b) => a.value - b.value);
+          setLowTipCategories(sorted.slice(0, 2).map(c => c.name));
+        }
 
+        // points history
+        const pointsRes = await fetch(`${API_BASE_URL}/api/users/${userId}/points-history`, { headers: authHeader });
+        if (pointsRes.ok) setPointsHistory(await pointsRes.json());
 
-        // Fetch points history
-        const pointsResponse = await fetch(`${API_BASE_URL}/api/users/${userId}/points-history`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (pointsResponse.ok) {
-          const pointsData = await pointsResponse.json();
-          setPointsHistory(pointsData);
+        // user challenges (joined)
+        const myChallengesRes = await fetch(`${API_BASE_URL}/api/challenges/user/${userId}`, { headers: authHeader });
+        if (myChallengesRes.ok) {
+          const list = await myChallengesRes.json();
+          setUserChallenges(Array.isArray(list) ? list : []);
         }
 
         setLoading(false);
       } catch (err) {
-        setError(err.message);
+        console.error(err);
+        setError(err.message || 'Failed to load dashboard');
         setLoading(false);
       }
     };
 
-    fetchUserData();
-    // eslint-disable-next-line
-  }, [currentUser]);
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, token]);
 
-  if (!currentUser && !loading) {
-    return <Navigate to="/login" />;
-  }
+  // Recently Approved (not dismissed)
+  const approvedNotifications = useMemo(() => {
+    const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    return (allCompletions || [])
+      .filter(c => String(c.reviewStatus).toLowerCase() === 'approved')
+      .filter(c => {
+        const id = c.id;
+        if (dismissedApproved.has(id)) return false;
+        const when = new Date(c.completedAt).getTime();
+        return isFinite(when) ? when >= cutoff : true;
+      })
+      .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+  }, [allCompletions, dismissedApproved]);
+
+  const dismissApproved = (item) => {
+    const next = new Set(dismissedApproved);
+    next.add(item.id);
+    setDismissedApproved(next);
+    setIdSet('approvedDismissedIds', next);
+
+    // tell the user how many points they actually got
+    const pts = Number(item.pointsEarned || 0);
+    const title = item.activity?.title || 'your activity';
+    showToast(pts > 0 ? `+${pts} points for “${title}” 🎉` : `Marked as read: “${title}”`);
+  };
+
+  // In-progress, de-duped challenges
+  const inProgressChallenges = useMemo(() => {
+    const now = new Date();
+    const byId = new Map();
+    (userChallenges || []).forEach(c => {
+      const start = new Date(c.startDate);
+      const end = new Date(c.endDate);
+      if (start <= now && end >= now) byId.set(c.id, c);
+    });
+    return [...byId.values()];
+  }, [userChallenges]);
+
+  // resubmit handler
+  const submitResubmission = async () => {
+    if (!resubmitTarget) return;
+    setResubmitting(true);
+    try {
+      const form = new FormData();
+      form.append('userId', String(userData.userId));
+      form.append('notes', resubmitNotes);
+      form.append('image', resubmitFile);
+
+      const resp = await fetch(`${API_BASE_URL}/api/activities/${resubmitTarget.id}/resubmit`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to resubmit activity');
+      }
+      const data = await resp.json();
+
+      // set back to Pending Review
+      setPendingItems(prev =>
+        prev.map(item =>
+          item.id === resubmitTarget.id
+            ? {
+                ...item,
+                reviewStatus: 'Pending Review',
+                adminNotes: null,
+                imageUrl: data?.completion?.imageUrl ?? item.imageUrl
+              }
+            : item
+        )
+      );
+
+      setResubmitOpen(false);
+      setResubmitTarget(null);
+      setResubmitNotes('');
+      setResubmitFile(null);
+      alert('Resubmitted for review ✅');
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setResubmitting(false);
+    }
+  };
+
+  // early returns
+  if (!currentUser && !loading) return <Navigate to="/login" />;
   if (loading) return <div className="loading-container"><div className="loading">Loading...</div></div>;
   if (error) return <div className="error-container"><div className="error">Error: {error}</div></div>;
   if (!userData) return <div className="no-user-container"><div className="no-user">No user data available</div></div>;
 
-  // Find the correct avatar image based on avatarStyle
-  const selectedAvatar = avatarStyles.find(
-    (style) => style.name === userData.avatarStyle
-  );
+  // avatar selection
+  const selectedAvatar = avatarStyles.find((style) => style.name === userData.avatarStyle);
+
+  // chart colors
+  const COLORS = ['#4CAF50', '#8BC34A', '#CDDC39', '#FFC107', '#FF9800', '#009688'];
 
   return (
     <div className="dashboard">
       <header className="dashboard-header">
         <h2>Welcome back, {userData.username}!</h2>
-        <div className="dashboard-avatar-block">
-          <img
-            src={selectedAvatar ? selectedAvatar.img : '/avatars/classic.png'}
-            alt="Your avatar"
-            className="dashboard-avatar-img"
-            style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', marginRight: 24 }}
-          />
-          <Link to="/profile/avatar" className="customize-avatar-link">
-            Customize Avatar
-          </Link>
-        </div>
-        <div className="user-stats">
-          <div className="stat">
-            <span className="stat-value" data-testid="user-points">{userData.points}</span>
-            <span className="stat-label">Points</span>
+        <p className="dashboard-guidance">
+          Need help? Hover over icons and stats for tips. Complete activities and challenges to earn more points!
+        </p>
+        <div className="dashboard-header-row">
+          <div className="dashboard-avatar-block">
+            <img
+              src={selectedAvatar ? selectedAvatar.img : '/avatars/classic.png'}
+              alt="Your avatar"
+              className="dashboard-avatar-img"
+              style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', marginRight: 24 }}
+              title="This is your current avatar. Click below to customize."
+            />
+            <Link to="/profile/avatar" className="customize-avatar-link" title="Change your avatar to personalize your profile!">
+              Customize Avatar
+            </Link>
           </div>
-          <StreakCounter userId={userData.userId} />
+
+          <div className="user-stats">
+            <div className="stat">
+              <span className="stat-value" data-testid="user-points" title="Earn points by completing activities and challenges!">
+                {userData.points}
+              </span>
+              <span className="stat-label">Total Points</span>
+            </div>
+            <StreakCounter userId={userData.userId} />
+          </div>
+
+          <div className="member-since-block" title="The date you joined Green Westminster.">
+            <span className="member-since-label">Member since</span>
+            <span className="member-since-date">
+              {userData.joinDate && !isNaN(Date.parse(userData.joinDate))
+                ? new Date(userData.joinDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+                : "Unknown"}
+            </span>
+          </div>
         </div>
       </header>
 
-      {/* Level Progress Section */}
+      {approvedNotifications.length > 0 && (
+        <section className="approved-section">
+          <div className="section-header"><h3>Recently Approved</h3></div>
+          <ul className="approved-list">
+            {approvedNotifications.map(item => (
+              <li key={item.id} className="approved-item">
+                <div className="approved-row">
+                  <div className="approved-meta">
+                    <span className="approved-title">{item.activity?.title || 'Activity Approved'}</span>
+                    <span className="approved-date">{formatDateTime(item.completedAt)}</span>
+                  </div>
+                  <button
+                    className="approved-gotit"
+                    onClick={() => dismissApproved(item)}
+                    aria-label="Dismiss approved item"
+                  >
+                    Got it
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Level Progress */}
       <section className="level-section">
-        <div className="section-header">
-          <h3>Your Level</h3>
-        </div>
+        <div className="section-header"><h3>Your Level</h3></div>
         <div className="level-card">
           <div className="level-badge">
-            <div className="badge-icon">👑</div>
-            <div className="badge-text">Level {levelInfo.currentLevel}</div>
+            <div className="badge-icon">
+              {({ Bronze: "🥉", Silver: "🥈", Gold: "🥇", Platinum: "🏆" }[levelInfo.currentLevel] || "👑")}
+            </div>
+            <div className="badge-text">{levelInfo.currentLevel}</div>
           </div>
           <div className="level-progress">
             <div className="progress-text">
-              <span className="level-title">Level {levelInfo.currentLevel}</span>
-              {levelInfo.pointsToNextLevel > 0 ? (
-                <span className="points-to-next">{levelInfo.pointsToNextLevel} points to Level {levelInfo.currentLevel + 1}</span>
-              ) : (
-                <span className="max-level">Max Level Reached!</span>
-              )}
+              <span className="level-title">{levelInfo.currentLevel}</span>
+              {levelInfo.pointsToNextLevel > 0 && levelInfo.nextLevel
+                ? <span className="points-to-next">{levelInfo.pointsToNextLevel} points to {levelInfo.nextLevel}</span>
+                : <span className="max-level">Max Level Reached!</span>}
             </div>
             <div className="progress-bar">
-              <div 
-                className="progress-fill" 
-                style={{ width: `${levelInfo.progressPercentage}%` }}
-              ></div>
+              <div className="progress-fill" style={{ width: `${levelInfo.progressPercentage}%` }} />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Carbon Impact Section */}
+      {/* Carbon Impact */}
       <section className="carbon-impact-section">
-        <div className="section-header">
-          <h3>Carbon Impact Estimate</h3>
-        </div>
+        <div className="section-header"><h3>Carbon Impact Estimate</h3></div>
         <div className="carbon-impact-container">
-          <div className="impact-card">
-            <div className="impact-icon">🌍</div>
-            <div className="impact-value">{carbonImpact.co2Reduced} kg</div>
-            <div className="impact-label">CO₂ Reduced</div>
-          </div>
-          <div className="impact-card">
-            <div className="impact-icon">🌳</div>
-            <div className="impact-value">{carbonImpact.treesEquivalent}</div>
-            <div className="impact-label">Trees Equivalent</div>
-          </div>
-          <div className="impact-card">
-            <div className="impact-icon">💧</div>
-            <div className="impact-value">{carbonImpact.waterSaved} L</div>
-            <div className="impact-label">Water Saved</div>
-          </div>
+          <div className="impact-card"><div className="impact-icon">🌍</div><div className="impact-value">{carbonImpact.co2Reduced} kg</div><div className="impact-label">CO₂ Reduced</div></div>
+          <div className="impact-card"><div className="impact-icon">🌳</div><div className="impact-value">{carbonImpact.treesEquivalent}</div><div className="impact-label">Trees Equivalent</div></div>
+          <div className="impact-card"><div className="impact-icon">💧</div><div className="impact-value">{carbonImpact.waterSaved} L</div><div className="impact-label">Water Saved</div></div>
         </div>
       </section>
 
-      {lowTipCategories.length > 0 && (
-  <section className="tips-section">
-    <div className="section-header">
-      <h3>Personalised Sustainability Tips</h3>
-    </div>
-    <div className="tips-container">
-      {lowTipCategories.map((category, idx) => (
-        <div key={idx} className="tip-card">
-          <h4>{category} Tips</h4>
-          <ul>
-            {(tipsByCategory[category] || []).slice(0, 2).map((tip, i) => (
-              <li key={i}>🌱 {tip}</li>
+      {/* Pending / Rejected */}
+      <section className="pending-activities-section">
+        <div className="section-header">
+          <h3>Pending & Rejected</h3>
+          <Link to="/activities" className="cta-btn">Go to Activities</Link>
+        </div>
+
+        {pendingItems.length === 0 ? (
+          <p>Nothing requiring your attention.<br /><span className="dashboard-guidance">Tip: Try logging a new activity to earn more points!</span></p>
+        ) : (
+          <ul className="pending-activities-list">
+            {pendingItems.map(activity => (
+              <li key={activity.id}>
+                <div className="pending-row">
+                  <span className="pending-title">{activity.title}</span>
+                  <span className={`status ${activity.reviewStatus?.toLowerCase()}`}>{activity.reviewStatus}</span>
+                </div>
+
+                {activity.reviewStatus === 'Rejected' && (
+                  <>
+                    <div className="admin-notes">
+                      <strong>Reason:</strong> {activity.adminNotes?.trim() ? activity.adminNotes : 'No reason provided.'}
+                    </div>
+                    <div className="pending-actions">
+                      <button
+                        className="resubmit-btn"
+                        onClick={() => {
+                          setResubmitTarget(activity);
+                          setResubmitNotes('');
+                          setResubmitFile(null);
+                          setResubmitOpen(true);
+                        }}
+                      >
+                        Resubmit
+                      </button>
+                    </div>
+                  </>
+                )}
+              </li>
             ))}
           </ul>
-        </div>
-      ))}
-    </div>
-  </section>
-)}
+        )}
+      </section>
 
-
-      {/* Progress Charts Section */}
-      <section className="progress-section">
+      {/* Your Challenges (only in-progress) */}
+      <section className="user-challenges-section">
         <div className="section-header">
-          <h3>Your Progress</h3>
+          <h3>Your Challenges</h3>
+          <Link to="/challenges" className="cta-btn">Go to Challenges</Link>
         </div>
+
+        {inProgressChallenges.length === 0 ? (
+          <p>You haven’t joined any in-progress challenges yet.</p>
+        ) : (
+          <ul className="user-challenges-list">
+            {inProgressChallenges.map(c => {
+              const start = new Date(c.startDate);
+              const end = new Date(c.endDate);
+              return (
+                <li key={c.id} className="challenge-item in-progress">
+                  <div className="challenge-info">
+                    <h4>{c.title}</h4>
+                    <span className="dates">{start.toLocaleDateString()} – {end.toLocaleDateString()}</span>
+                  </div>
+                  <span className="status in-progress">In Progress</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* Tips */}
+      {lowTipCategories.length > 0 && (
+        <section className="tips-section">
+          <div className="section-header"><h3>Personalised Sustainability Tips</h3></div>
+          <div className="tips-container">
+            {lowTipCategories.map((category, idx) => (
+              <div key={idx} className="tip-card">
+                <h4>{category} Tips</h4>
+                <ul>
+                  {(tipsByCategory[category] || []).slice(0, 2).map((tip, i) => (<li key={i}>🌱 {tip}</li>))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Progress Charts */}
+      <section className="progress-section">
+        <div className="section-header"><h3>Your Progress</h3></div>
         <div className="charts-container">
           <div className="chart-row">
-            {/* Category Distribution Chart */}
             <div className="chart-card">
-              <h4>Activities by Category</h4>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={activityStats.categoryCounts}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    nameKey="name"
-                    label={({ name, percent }) => {
-                      const percentValue = (percent * 100).toFixed(0);
-                      return name?.length > 10 ? `${percentValue}%` : `${name}: ${percentValue}%`;
-                    }}
-                  >
-                    {activityStats.categoryCounts.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value, name) => [`${value} activities`, name]} />
-                  <Legend layout="vertical" verticalAlign="middle" align="right" />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+  <h4>Activities by Category</h4>
 
-            {/* Weekly Activity Chart */}
+  <div className="chart-split">
+    <div className="chart-plot">
+      <ResponsiveContainer width="100%" height={260}>
+        <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+          <Pie
+            data={activityStats.categoryCounts}
+            cx="50%" cy="50%"
+            innerRadius={45} outerRadius={95}
+            labelLine={false}
+            dataKey="value" nameKey="name"
+            label={({ percent }) => (percent > 0.08 ? `${(percent * 100).toFixed(0)}%` : '')}
+          >
+            {activityStats.categoryCounts.map((_, i) => (
+              <Cell key={i} fill={COLORS[i % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(v, n) => [`${v} activities`, n]} />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+
+    <ul className="chart-legend">
+      {activityStats.categoryCounts.map((d, i) => (
+        <li key={d.name}>
+          <span className="swatch" style={{ background: COLORS[i % COLORS.length] }} />
+          {d.name}
+        </li>
+      ))}
+    </ul>
+  </div>
+</div>
+
+
             <div className="chart-card">
               <h4>Weekly Activity</h4>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart
-                  data={activityStats.weeklyActivity}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
+                <BarChart data={activityStats.weeklyActivity} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="day" />
                   <YAxis />
@@ -329,14 +561,10 @@ if (impactResponse.ok) {
             </div>
           </div>
 
-          {/* Points Progress Chart */}
           <div className="chart-card full-width">
             <h4>Points Progress</h4>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart
-                data={pointsHistory}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
+              <LineChart data={pointsHistory} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
                 <YAxis />
@@ -349,19 +577,53 @@ if (impactResponse.ok) {
         </div>
       </section>
 
-      <section className="dashboard-content">
-        <div className="section-header">
-          <h3>Log Your Actions</h3>
-          <Link to="/activities" className="view-all">View All</Link>
-        </div>
-        <ActivitiesPage userId={userData.userId} />
+      {/* Resubmit Modal */}
+      {resubmitOpen && resubmitTarget && (
+        <div className="modal-overlay">
+          <div className="completion-modal">
+            <h3>Resubmit: {resubmitTarget.title}</h3>
 
-        <div className="section-header">
-          <h3>Active Challenges</h3>
-          <Link to="/challenges" className="view-all">View All</Link>
+            <label className="form-group">
+              <span>Notes</span>
+              <textarea
+                value={resubmitNotes}
+                onChange={(e) => setResubmitNotes(e.target.value)}
+                rows={3}
+                placeholder="Add clarification or fixes based on the admin’s feedback"
+              />
+            </label>
+
+            <label className="form-group">
+              <span>Upload new image</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setResubmitFile(e.target.files?.[0] || null)}
+              />
+            </label>
+
+            <div className="modal-actions">
+              <button className="cancel-btn" onClick={() => setResubmitOpen(false)} disabled={resubmitting}>
+                Cancel
+              </button>
+              <button
+                className="submit-btn"
+                onClick={submitResubmission}
+                disabled={resubmitting || !resubmitNotes.trim() || !resubmitFile}
+              >
+                {resubmitting ? 'Submitting...' : 'Send for Review'}
+              </button>
+            </div>
+          </div>
         </div>
-        <ActiveChallenges userId={userData.userId} />
-      </section>
+      )}
+
+      {/* Toast UI (add styles from my previous message) */}
+      {toast && (
+        <div className="toast toast-success">
+          {toast}
+        </div>
+      )}
     </div>
   );
 };

@@ -33,8 +33,9 @@
 }
 
 .nav-link.active {
-  background-color: #e8f5e9;
-  font-weight: 500;
+  color: #388e3c;
+  font-weight: bold;
+  border-bottom: 2px solid #388e3c;
 }
 
 .nav-toggle {
@@ -89,6 +90,10 @@
 
 .login-btn:hover {
   background-color: #e8f5e9;
+}
+
+.admin-login-btn {
+  border: 1px solid #2e7d32;
 }
 
 .register-btn {
@@ -223,6 +228,10 @@
   gap: 1.5rem;
 }
 
+.nav-links .nav-events-right {
+  margin-left: auto;
+}
+
 .main-content {
   padding-top: 60px; /* Match the height of navbar */
 }
@@ -231,4 +240,18 @@
 .nav-links a {
   padding: 0.5rem 0.8rem; /* Slightly reduced padding */
   display: inline-block;
+}
+
+.nav-link:hover,
+.profile-link:hover {
+  background-color: #c8e6c9; /* More contrast than #e8f5e9 */
+  text-decoration: underline;
+  color: #145214;
+}
+
+.nav-link.active {
+  color: #388e3c;
+  font-weight: bold;
+  border-bottom: 2px solid #388e3c;
+  background-color: #e8f5e9;
 }

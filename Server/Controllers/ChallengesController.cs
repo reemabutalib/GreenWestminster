@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Server.Services.Interfaces;
 using Server.DTOs;
-using Server.Data;
+using System.Linq; // for claims parsing
 
 namespace Server.Controllers;
 
@@ -17,12 +17,28 @@ public class ChallengesController : ControllerBase
 {
     private readonly IChallengesService _challengesService;
     private readonly ILogger<ChallengesController> _logger;
-    private readonly AppDbContext _context;
 
     public ChallengesController(IChallengesService challengesService, ILogger<ChallengesController> logger)
     {
         _challengesService = challengesService;
         _logger = logger;
+    }
+
+    // Helper: best-effort userId from auth claims (optional)
+    private int? GetCurrentUserId()
+    {
+        if (User?.Identity?.IsAuthenticated != true) return null;
+
+        // common claim types: sub, nameidentifier, custom "userId"
+        var claim = User.Claims.FirstOrDefault(c =>
+            c.Type.EndsWith("nameidentifier", StringComparison.OrdinalIgnoreCase) ||
+            c.Type.Equals("sub", StringComparison.OrdinalIgnoreCase) ||
+            c.Type.Equals("userId", StringComparison.OrdinalIgnoreCase));
+
+        if (claim != null && int.TryParse(claim.Value, out var uid))
+            return uid;
+
+        return null;
     }
 
     // GET: api/challenges
@@ -31,7 +47,8 @@ public class ChallengesController : ControllerBase
     {
         try
         {
-            var challenges = await _challengesService.GetChallengesAsync();
+            var userId = GetCurrentUserId();
+            var challenges = await _challengesService.GetChallengesAsync(userId);
             return Ok(challenges);
         }
         catch (Exception ex)
@@ -47,7 +64,8 @@ public class ChallengesController : ControllerBase
     {
         try
         {
-            var challenges = await _challengesService.GetActiveChallengesAsync();
+            var userId = GetCurrentUserId();
+            var challenges = await _challengesService.GetActiveChallengesAsync(userId);
             return Ok(challenges);
         }
         catch (Exception ex)
@@ -57,13 +75,31 @@ public class ChallengesController : ControllerBase
         }
     }
 
+    // GET: api/challenges/past
+    [HttpGet("past")]
+    public async Task<ActionResult<IEnumerable<object>>> GetPastChallenges()
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var challenges = await _challengesService.GetPastChallengesAsync(userId);
+            return Ok(challenges);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while fetching past challenges");
+            return StatusCode(500, new { message = "An error occurred while retrieving past challenges", error = ex.Message });
+        }
+    }
+
     // GET: api/challenges/5
     [HttpGet("{id}")]
     public async Task<ActionResult<object>> GetChallenge(int id)
     {
         try
         {
-            var challenge = await _challengesService.GetChallengeByIdAsync(id);
+            var userId = GetCurrentUserId();
+            var challenge = await _challengesService.GetChallengeByIdAsync(id, userId);
             if (challenge == null)
                 return NotFound(new { message = "Challenge not found" });
 
@@ -109,7 +145,7 @@ public class ChallengesController : ControllerBase
         }
     }
 
-    // POST: api/challenges/{id}/join
+    // POST: api/challenges/{challengeId}/join
     [HttpPost("{challengeId}/join")]
     [Authorize]
     public async Task<ActionResult> JoinChallenge(int challengeId, [FromBody] JoinChallengeDto joinData)
@@ -132,7 +168,7 @@ public class ChallengesController : ControllerBase
         }
     }
 
-    // Support for legacy API format
+    // Legacy format: POST api/challenges/{challengeId}/join/{userId}
     [HttpPost("{challengeId}/join/{userId}")]
     [Authorize]
     public async Task<ActionResult> JoinChallengeWithUrlParams(int challengeId, int userId)
@@ -141,9 +177,9 @@ public class ChallengesController : ControllerBase
         return await JoinChallenge(challengeId, joinData);
     }
 
-    // POST: api/challenges/{id}/activities
+    // POST: api/challenges/{challengeId}/activities
     [HttpPost("{challengeId}/activities")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult> AddActivitiesToChallenge(int challengeId, [FromBody] List<int> activityIds)
     {
         try
@@ -158,22 +194,6 @@ public class ChallengesController : ControllerBase
         {
             _logger.LogError(ex, "Error occurred while adding activities to challenge {ChallengeId}", challengeId);
             return StatusCode(500, new { message = "An error occurred while adding activities to the challenge", error = ex.Message });
-        }
-    }
-
-    // GET: api/challenges/past
-    [HttpGet("past")]
-    public async Task<ActionResult<IEnumerable<object>>> GetPastChallenges()
-    {
-        try
-        {
-            var challenges = await _challengesService.GetPastChallengesAsync();
-            return Ok(challenges);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while fetching past challenges");
-            return StatusCode(500, new { message = "An error occurred while retrieving past challenges", error = ex.Message });
         }
     }
 

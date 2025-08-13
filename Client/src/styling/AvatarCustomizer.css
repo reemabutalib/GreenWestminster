@@ -54,3 +54,107 @@
   font-weight: bold;
   cursor: pointer;
 }
+
+/* --- Layout: 3 per row inside each tier --- */
+.avatar-tier .avatar-style-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(140px, 1fr)); /* wider cards */
+  gap: 14px;
+}
+
+/* Responsive: drop to 2 / 1 on small screens */
+@media (max-width: 560px) {
+  .avatar-tier .avatar-style-list { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+}
+@media (max-width: 380px) {
+  .avatar-tier .avatar-style-list { grid-template-columns: 1fr; }
+}
+
+/* --- Card: shorter, tighter, consistent height --- */
+.avatar-style-btn {
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 10px;
+  padding: 10px 8px;
+  cursor: pointer;
+  transition: box-shadow .18s ease, transform .08s ease;
+  display: grid;
+  grid-template-rows: 92px auto; 
+  align-items: center;
+  min-height: 130px;
+}
+
+.avatar-style-btn:hover { 
+  box-shadow: 0 6px 16px rgba(0,0,0,.08); 
+  transform: translateY(-1px); 
+}
+.avatar-style-btn:focus-visible {
+  outline: 3px solid rgba(76,175,80,.55);
+  outline-offset: 2px;
+}
+.avatar-style-btn.selected { 
+  border-color: #4caf50; 
+  box-shadow: 0 0 0 3px rgba(76,175,80,.18);
+}
+.avatar-style-btn.locked { 
+  opacity: .6; 
+  cursor: not-allowed; 
+}
+
+/* --- Thumbnail area (keeps cards equal height) --- */
+.avatar-img {
+  width: 100%;
+  height: 92px;         /* shorter than before */
+  object-fit: contain;
+  margin: 0;            /* remove extra bottom gap */
+}
+
+/* --- Name line: single, trimmed --- */
+.avatar-name {
+  margin-top: 6px;
+  font-weight: 600;
+  font-size: 0.85rem; /* slightly smaller */
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal; /* allow wrap */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Lock badge: compact in corner --- */
+.locked-overlay {
+  position: absolute;
+  top: 6px; 
+  right: 6px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 50%;
+  width: 24px; 
+  height: 24px;
+  display: grid; 
+  place-items: center;
+  color: #b00020;
+  font-size: 1rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06);
+}
+
+/* --- Container & headings spacing polish --- */
+.avatar-customizer {
+  max-width: 780px;          /* a bit wider to breathe */
+  padding: 1.5rem;
+}
+.avatar-tier { 
+  margin-bottom: 1.25rem; 
+}
+.tier-heading { 
+  margin: .25rem 0 .75rem; 
+  font-weight: 700; 
+}
+
+/* Optional: subtle tier color accents on headings */
+.tier-bronze   { color: #8d6e63; }
+.tier-silver   { color: #90a4ae; }
+.tier-gold     { color: #c9a227; }
+.tier-platinum { color: #90caf9; }
+
+

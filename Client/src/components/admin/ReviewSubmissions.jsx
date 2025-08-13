@@ -14,56 +14,60 @@ const ReviewSubmissions = () => {
   const token = localStorage.getItem('token');
 
   const fetchSubmissions = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const query = new URLSearchParams();
-      query.append('reviewStatus', 'Pending Review');
-      if (startDate) query.append('startDate', startDate);
-      if (endDate) query.append('endDate', endDate);
+  setLoading(true);
+  setError(null);
+  try {
+    const query = new URLSearchParams();
+    // default to only pending
+    query.set('reviewStatus', 'Pending Review');
+    if (startDate) query.set('startDate', startDate);
+    if (endDate)   query.set('endDate', endDate);
 
-      const response = await axios.get(`${API_URL}/api/admin/activity-completions?${query.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      setSubmissions(response.data);
-    } catch (err) {
-      setError(err.message || 'Failed to load submissions');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const url = `${API_URL}/api/admin/activity-completions?reviewStatus=Pending%20Review`;
+    const { data } = await axios.get(
+      url,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    setSubmissions(data);
+  } catch (err) {
+    setError(err.message || 'Failed to load submissions');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     fetchSubmissions();
   }, []); // Run once on mount
 
   const handleReview = async (id, status) => {
-    const adminNotes = prompt(`Enter notes for ${status}:`, '');
+  const adminNotes = prompt(`Enter notes for ${status}:`, '');
+  if (adminNotes === null) return;
+  if (!window.confirm(`Are you sure you want to mark this submission as ${status}?`)) return;
 
-    if (adminNotes === null) return;
+  setSubmitting(true);
+  try {
+    await axios.patch(
+      `${API_URL}/api/activities/review/${id}`,
+      { status, adminNotes },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-    if (!window.confirm(`Are you sure you want to mark this submission as ${status}?`)) return;
+    // Optimistic update: drop it from the list
+    setSubmissions(prev => prev.filter(s => s.id !== id));
 
-    setSubmitting(true);
-    try {
-      await axios.patch(
-        `${API_URL}/api/activities/review/${id}`,
-        { status, adminNotes },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+    // Optional: keep this if you want to re-sync with server
+    // await fetchSubmissions();
 
-      setSubmissions((prev) => prev.filter((s) => s.id !== id));
-      alert(`Submission ${status.toLowerCase()} successfully.`);
-    } catch (err) {
-      alert('Failed to review submission: ' + err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    alert(`Submission ${status.toLowerCase()} successfully.`);
+  } catch (err) {
+    alert('Failed to review submission: ' + err.message);
+  } finally {
+    setSubmitting(false);
+  }
+};
+
 
   return (
     <div className="review-submissions">
@@ -82,45 +86,64 @@ const ReviewSubmissions = () => {
         <button onClick={fetchSubmissions} disabled={loading}>Apply Filters</button>
       </div>
 
-      {loading && <div>Loading submissions...</div>}
-      {error && <div className="error-message">Error: {error}</div>}
-      {!loading && submissions.length === 0 && <div>No pending submissions</div>}
+{loading && <div>Loading submissions...</div>}
+{error && <div className="error-message">Error: {error}</div>}
+{!loading && submissions.length === 0 && <div>No pending submissions</div>}
 
-      <div className="submission-list">
-        {submissions.map((submission) => (
-          <div key={submission.id} className="submission-card">
-            <h4>{submission.activityTitle}</h4>
-            <p><strong>User:</strong> {submission.username}</p>
-            <p><strong>Date:</strong> {new Date(submission.completedAt).toLocaleString()}</p>
-            {submission.quantity && <p><strong>Quantity:</strong> {submission.quantity}</p>}
-            <p><strong>Notes:</strong> {submission.notes || 'N/A'}</p>
+<div className="submission-list">
+  {submissions.map((submission) => {
+    // Prefer absolute imageUrl if present. Otherwise build from imagePath + API base.
+    const imgSrc =
+      submission.imageUrl && /^https?:\/\//i.test(submission.imageUrl.trim())
+        ? submission.imageUrl.trim()
+        : submission.imagePath
+        ? `${API_URL.replace(/\/$/, '')}/uploads/${String(submission.imagePath).trim()}`
+        : null;
 
-            {submission.imageUrl && (
-              <div className="submission-image">
-                <img src={submission.imageUrl} alt="Evidence" />
-              </div>
-            )}
+    return (
+      <div key={submission.id} className="submission-card">
+        <h4>{submission.activityTitle}</h4>
+        <p><strong>User:</strong> {submission.username}</p>
+        <p><strong>Date:</strong> {new Date(submission.completedAt).toLocaleString()}</p>
+        {submission.quantity && <p><strong>Quantity:</strong> {submission.quantity}</p>}
+        <p><strong>Notes:</strong> {submission.notes || 'N/A'}</p>
 
-            <div className="submission-actions">
-              <button
-                className="approve-btn"
-                onClick={() => handleReview(submission.id, 'Approved')}
-                disabled={submitting}
-              >
-                Approve
-              </button>
-              <button
-                className="reject-btn"
-                onClick={() => handleReview(submission.id, 'Rejected')}
-                disabled={submitting}
-              >
-                Reject
-              </button>
-            </div>
+        {imgSrc && (
+          <div className="submission-image">
+            <img
+              src={imgSrc}
+              alt="Evidence"
+              onError={(e) => {
+                console.error('🧩 Image failed to load:', imgSrc);
+                e.currentTarget.alt = 'Image failed to load';
+                e.currentTarget.style.display = 'none'; // hide broken image icon
+              }}
+              style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
+            />
           </div>
-        ))}
+        )}
+
+        <div className="submission-actions">
+          <button
+            className="approve-btn"
+            onClick={() => handleReview(submission.id, 'Approved')}
+            disabled={submitting}
+          >
+            Approve
+          </button>
+          <button
+            className="reject-btn"
+            onClick={() => handleReview(submission.id, 'Rejected')}
+            disabled={submitting}
+          >
+            Reject
+          </button>
+        </div>
       </div>
-    </div>
+    );
+  })}
+</div>
+</div>
   );
 };
 

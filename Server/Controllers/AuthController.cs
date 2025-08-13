@@ -1,17 +1,11 @@
 using Server.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using System;
-using System.Collections.Generic;
 using System.Security.Claims;
-using System.Text;
 using System.Threading.Tasks;
-using System.ComponentModel.DataAnnotations;
-using Microsoft.AspNetCore.Identity;
-using System.Linq;
+using Microsoft.Extensions.Logging;
 using Server.Services.Interfaces;
 using Server.DTOs;
-using Server.Data;
 
 namespace Server.Controllers
 {
@@ -21,7 +15,6 @@ namespace Server.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
-        private readonly AppDbContext _context;
 
         public AuthController(IAuthService authService, ILogger<AuthController> logger)
         {
@@ -39,12 +32,12 @@ namespace Server.Controllers
                 if (!result.Success)
                     return BadRequest(new { success = false, message = result.Message });
 
-                return new
+                return Ok(new
                 {
                     success = true,
                     userId = result.UserId,
                     username = result.Username
-                };
+                });
             }
             catch (Exception ex)
             {
@@ -63,15 +56,16 @@ namespace Server.Controllers
                 if (!result.Success)
                     return Unauthorized(new { success = false, message = result.Message });
 
-                return new
+                return Ok(new
                 {
                     success = true,
                     token = result.Token,
+                    refreshToken = result.RefreshToken,
                     userId = result.UserId,
                     username = result.Username,
                     email = result.Email,
                     roles = result.Roles
-                };
+                });
             }
             catch (Exception ex)
             {
@@ -105,11 +99,11 @@ namespace Server.Controllers
 
         // POST: api/auth/validate-token
         [HttpPost("validate-token")]
-        public ActionResult ValidateToken()
+        public async Task<ActionResult> ValidateToken()
         {
             try
             {
-                var result = _authService.ValidateTokenAsync(User).Result;
+                var result = await _authService.ValidateTokenAsync(User);
                 if (!result.Success)
                     return Unauthorized(new { success = false, message = "Invalid token" });
 
@@ -119,6 +113,30 @@ namespace Server.Controllers
             {
                 _logger.LogError(ex, "Token validation error");
                 return StatusCode(500, new { success = false, message = "An error occurred during token validation" });
+            }
+        }
+
+        // POST: api/auth/refresh
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh([FromBody] string refreshToken)
+        {
+            try
+            {
+                var result = await _authService.RefreshTokenAsync(refreshToken);
+                if (!result.Success)
+                    return Unauthorized(new { success = false, message = "Invalid or expired refresh token" });
+
+                return Ok(new
+                {
+                    success = true,
+                    token = result.NewJwt,
+                    refreshToken = result.NewRefreshToken
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Refresh token error");
+                return StatusCode(500, new { success = false, message = "An error occurred during token refresh" });
             }
         }
     }

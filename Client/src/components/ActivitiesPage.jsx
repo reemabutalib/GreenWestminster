@@ -89,7 +89,7 @@ const ActivitiesPage = () => {
     setSelectedActivity(activity);
     setShowCompletionModal(true);
     setConfirmationChecked(false);
-    setCompletedAt(''); 
+    setCompletedAt('');
     setNotes('');
     setImage(null);
     setImagePreview(null);
@@ -115,58 +115,96 @@ const ActivitiesPage = () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!confirmationChecked) {
-    const timeframe = getPropertyValue(selectedActivity, ['isDaily']) ? "today" : "this week";
-    alert(`Please confirm that you completed this activity ${timeframe}.`);
-    return;
-  }
-
-  if (!completedAt) {
-    alert("Please select the date you completed the activity.");
-    return;
-  }
-
-  setSubmitting(true);
-
-  try {
-    const isoDate = new Date(completedAt).toISOString();
-    console.log("📅 Submitting completedAt:", completedAt);
-    console.log("📦 ISO formatted date:", isoDate);
-
-    const formData = new FormData();
-    formData.append('userId', userId);
-    formData.append('completedAt', isoDate);
-    if (notes) formData.append('notes', notes);
-    if (quantity) formData.append('quantity', quantity);
-    if (image) formData.append('image', image);
-
-    const response = await fetch(`${API_BASE_URL}/api/activities/${selectedActivity.id}/complete`, {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("🚫 Backend error response:", errorData);
-      throw new Error(errorData.message || 'Failed to complete activity');
+    if (!confirmationChecked) {
+      const timeframe = getPropertyValue(selectedActivity, ['isDaily']) ? "today" : "this week";
+      alert(`Please confirm that you completed this activity ${timeframe}.`);
+      return;
     }
 
-    const result = await response.json();
-    console.log("✅ Completion submitted successfully:", result);
+    if (!completedAt) {
+      alert("Please select the date you completed the activity.");
+      return;
+    }
 
-    alert(`Activity submitted for review! You'll earn points once it's approved.\nCO₂ Reduction: ${result.co2eReduction.toFixed(2)} kg`);
+    // Quantity must be a positive number
+    const qty = Number(quantity);
+    if (Number.isNaN(qty) || qty <= 0) {
+      alert("Please enter a valid quantity greater than 0.");
+      return;
+    }
 
-    setPendingActivities((prev) => [...prev, selectedActivity.id]);
-    setShowCompletionModal(false);
-  } catch (err) {
-    console.error('❌ Error completing activity:', err);
-    alert(`Error: ${err.message}`);
-  } finally {
-    setSubmitting(false);
-  }
-};
+    // Image is required now
+    if (!image) {
+      alert("Please upload a photo as evidence.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const isoDate = new Date(completedAt).toISOString();
+      console.log("📅 Submitting completedAt:", completedAt);
+      console.log("📦 ISO formatted date:", isoDate);
+
+      const formData = new FormData();
+      formData.append('userId', userId);
+      formData.append('completedAt', isoDate);
+      if (notes) formData.append('notes', notes);
+      if (quantity) formData.append('quantity', quantity);
+      if (image) formData.append('image', image);
+
+      const response = await fetch(`${API_BASE_URL}/api/activities/${selectedActivity.id}/complete`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to complete activity');
+      }
+
+      const result = await response.json();
+
+      // Points logic
+      const co2Points = Math.max(0, Math.floor((Number(result.co2eReduction) || 0) / 0.5));
+      let waterPoints = 0;
+      let waterSaved = result.waterSaved || 0;
+
+      // Check if this is a water activity
+      if (
+        selectedActivity.category &&
+        selectedActivity.category.toLowerCase().includes('water')
+      ) {
+        // 1 point per 10 liters saved (adjust as needed)
+        waterPoints = Math.floor(Number(waterSaved) / 10);
+      }
+
+      const estimatedPoints = co2Points + waterPoints;
+
+      alert(
+        `Activity submitted for review!\n` +
+        `CO₂ Reduction: ${Number(result.co2eReduction || 0).toFixed(2)} kg\n` +
+        (waterSaved > 0 ? `Water Saved: ${Number(waterSaved).toFixed(2)} liters\n` : '') +
+        `Estimated points on approval: ${estimatedPoints}`
+      );
+
+      // Avoid duplicate pending IDs
+      setPendingActivities(prev => {
+        const set = new Set(prev);
+        set.add(selectedActivity.id);
+        return Array.from(set);
+      });
+
+      setShowCompletionModal(false);
+    } catch (err) {
+      console.error('❌ Error completing activity:', err);
+      alert(`Error: ${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
 
   if (loading) return <div className="loading">Loading...</div>;
@@ -178,7 +216,7 @@ const ActivitiesPage = () => {
 
       <div className="frequency-filters">
         {['all', 'daily', 'weekly'].map(freq => (
-          <button 
+          <button
             key={freq}
             className={`frequency-btn ${activeFrequency === freq ? 'active' : ''}`}
             onClick={() => setActiveFrequency(freq)}
@@ -189,14 +227,14 @@ const ActivitiesPage = () => {
       </div>
 
       <div className="category-filters">
-        <button 
+        <button
           className={`category-btn ${activeCategory === 'all' ? 'active' : ''}`}
           onClick={() => setActiveCategory('all')}
         >
           All Categories
         </button>
         {categories.map(category => (
-          <button 
+          <button
             key={category}
             className={`category-btn ${activeCategory === category ? 'active' : ''}`}
             onClick={() => setActiveCategory(category)}
@@ -209,8 +247,8 @@ const ActivitiesPage = () => {
       <div className="activities-grid">
         {filteredActivities.length > 0 ? (
           filteredActivities.map(activity => (
-            <ActivityCard 
-              key={activity.id || activity.Id} 
+            <ActivityCard
+              key={activity.id || activity.Id}
               activity={activity}
               onCompleteClick={handleCompleteClick}
               isPending={pendingActivities.includes(activity.id)}
@@ -229,31 +267,31 @@ const ActivitiesPage = () => {
 
             <form onSubmit={handleSubmit}>
               <div className="confirmation-checkbox">
-                <input 
-                  type="checkbox" 
-                  id="confirmation" 
-                  checked={confirmationChecked} 
+                <input
+                  type="checkbox"
+                  id="confirmation"
+                  checked={confirmationChecked}
                   onChange={(e) => setConfirmationChecked(e.target.checked)}
                 />
                 <label htmlFor="confirmation">{getConfirmationText(selectedActivity)}</label>
               </div>
 
               <div className="form-group">
-  <label htmlFor="completedAt">Date Completed</label>
-  <input 
-    type="date" 
-    id="completedAt" 
-    value={completedAt}
-    onChange={(e) => setCompletedAt(e.target.value)}
-    required
-  />
-</div>
+                <label htmlFor="completedAt">Date Completed</label>
+                <input
+                  type="date"
+                  id="completedAt"
+                  value={completedAt}
+                  onChange={(e) => setCompletedAt(e.target.value)}
+                  required
+                />
+              </div>
 
 
               <div className="form-group">
                 <label htmlFor="notes">Notes (optional)</label>
-                <textarea 
-                  id="notes" 
+                <textarea
+                  id="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add any details about how you completed this activity..."
@@ -263,7 +301,7 @@ const ActivitiesPage = () => {
 
               <div className="form-group">
                 <label htmlFor="quantity">Quantity (required for carbon impact)</label>
-                <input 
+                <input
                   type="number"
                   id="quantity"
                   step="0.01"
@@ -276,13 +314,17 @@ const ActivitiesPage = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="image">Upload Image (optional)</label>
-                <input 
-                  type="file" 
-                  id="image" 
+                <label htmlFor="image">Upload Image (required)</label>
+                <input
+                  type="file"
+                  id="image"
                   accept="image/*"
                   onChange={handleImageChange}
+                  required
                 />
+                <small className="image-guidance">
+                  Please upload a clear photo as evidence of your activity. For example: a picture of your reusable bottle, your bike, a public transport ticket, or your completed action. Avoid uploading selfies or unrelated images.
+                </small>
                 {imagePreview && (
                   <div className="image-preview">
                     <img src={imagePreview} alt="Preview" />
@@ -292,7 +334,17 @@ const ActivitiesPage = () => {
 
               <div className="modal-actions">
                 <button type="button" className="cancel-btn" onClick={() => setShowCompletionModal(false)} disabled={submitting}>Cancel</button>
-                <button type="submit" className="submit-btn" disabled={submitting || !confirmationChecked}>
+                <button
+                  type="submit"
+                  className="submit-btn"
+                  disabled={
+                    submitting ||
+                    !confirmationChecked ||
+                    !completedAt ||
+                    !image ||
+                    !quantity || Number(quantity) <= 0
+                  }
+                >
                   {submitting ? 'Submitting...' : 'Submit'}
                 </button>
               </div>

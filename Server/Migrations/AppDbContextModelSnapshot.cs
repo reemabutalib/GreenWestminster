@@ -232,7 +232,8 @@ namespace Server.Migrations
                         .HasColumnName("activityid");
 
                     b.Property<string>("AdminNotes")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("adminnotes");
 
                     b.Property<double?>("Co2eReduction")
                         .HasColumnType("double precision")
@@ -243,23 +244,24 @@ namespace Server.Migrations
                         .HasColumnName("completedat");
 
                     b.Property<string>("ImagePath")
-                        .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("imagepath");
 
                     b.Property<string>("Notes")
-                        .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("notes");
 
                     b.Property<int>("PointsEarned")
                         .HasColumnType("integer")
                         .HasColumnName("pointsearned");
 
                     b.Property<double?>("Quantity")
-                        .HasColumnType("double precision");
+                        .HasColumnType("double precision")
+                        .HasColumnName("quantity");
 
                     b.Property<string>("ReviewStatus")
-                        .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("reviewstatus");
 
                     b.Property<int>("UserId")
                         .HasColumnType("integer")
@@ -313,6 +315,43 @@ namespace Server.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("challenges", (string)null);
+                });
+
+            modelBuilder.Entity("Server.Models.RefreshToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created");
+
+                    b.Property<DateTime>("Expires")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires");
+
+                    b.Property<bool>("IsRevoked")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isrevoked");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("token");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("userid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("refreshtokens", (string)null);
                 });
 
             modelBuilder.Entity("Server.Models.SustainabilityEvent", b =>
@@ -471,12 +510,13 @@ namespace Server.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("joindate");
 
-                    b.Property<DateTime>("LastActivityDate")
+                    b.Property<DateTime?>("LastActivityDate")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lastactivitydate");
 
-                    b.Property<int>("Level")
-                        .HasColumnType("integer");
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int>("MaxStreak")
                         .HasColumnType("integer")
@@ -528,7 +568,7 @@ namespace Server.Migrations
 
                     b.Property<DateTime>("JoinedDate")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("joineddate");
+                        .HasColumnName("joindate");
 
                     b.Property<int>("Progress")
                         .HasColumnType("integer")
@@ -618,6 +658,17 @@ namespace Server.Migrations
                         .IsRequired();
 
                     b.Navigation("Activity");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Server.Models.RefreshToken", b =>
+                {
+                    b.HasOne("Server.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });

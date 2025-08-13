@@ -1,103 +1,191 @@
+/* Page container */
 .leaderboard-page {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 1rem 0;
+  padding: 2rem 1rem 3rem;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
+/* Title and subtitle */
 .leaderboard-page h2 {
   margin-bottom: 0.5rem;
   color: #2e7d32;
+  font-weight: 700;
+  font-size: 2rem;
+  letter-spacing: -1px;
 }
 
 .subtitle {
   color: #616161;
   margin-bottom: 2rem;
+  font-size: 1.08rem;
 }
 
+/* Filter buttons */
 .leaderboard-filters {
   display: flex;
   gap: 1rem;
   margin-bottom: 2rem;
+  flex-wrap: wrap;
 }
 
 .filter-btn {
-  background-color: transparent;
-  color: #616161;
-  border: 1px solid #e0e0e0;
-  padding: 0.5rem 1.5rem;
-  border-radius: 20px;
+  background: #fff;
+  color: #2e7d32;
+  border: 1.5px solid #c8e6c9;
+  padding: 0.6rem 1.5rem;
+  border-radius: 24px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 1rem;
+  font-weight: 500;
   transition: all 0.2s;
 }
 
 .filter-btn:hover {
-  background-color: #f1f8e9;
-  color: #2e7d32;
-  border-color: #c8e6c9;
+  background: #e8f5e9;
+  color: #145214;
+  border-color: #81c784;
 }
 
 .filter-btn.active {
-  background-color: #e8f5e9;
+  background: #c8e6c9;
   color: #2e7d32;
-  border-color: #81c784;
-  font-weight: 500;
+  border-color: #388e3c;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.10);
 }
 
+/* Your rank banner */
 .your-rank {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  margin: 2rem 0;
-  padding: 1.5rem;
-  background-color: #e8f5e9;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  gap: 1.5rem;
+  margin: 1.5rem 0 2rem;
+  padding: 1.25rem 2rem;
+  border-radius: 14px;
+  background: #f4fbf5;
+  border: 1.5px solid #dcedc8;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.07);
+  font-size: 1.15rem;
+}
+
+.your-tier {
+  font-weight: 800;
+  color: #2e7d32;
+  font-size: 1.15rem;
+  margin-right: 0.5rem;
 }
 
 .rank-label {
-  font-weight: 500;
   color: #2e7d32;
-  margin-bottom: 0.5rem;
+  font-weight: 600;
+  margin-right: 0.5rem;
 }
 
 .rank-value {
-  font-size: 3rem;
-  font-weight: bold;
+  font-size: 2.2rem;
+  font-weight: 800;
   color: #2e7d32;
-  line-height: 1;
+  margin-right: 0.5rem;
 }
 
 .rank-suffix {
   color: #616161;
-  margin-top: 0.5rem;
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
-.leaderboard-container {
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+/* Tier-specific accent for the banner */
+.your-rank--bronze   { border-left: 8px solid #8d6e63; background: #f8f4f1; }
+.your-rank--silver   { border-left: 8px solid #90a4ae; background: #f5f7f9; }
+.your-rank--gold     { border-left: 8px solid #c9a227; background: #fff9e6; }
+.your-rank--platinum { border-left: 8px solid #90caf9; background: #f0f8ff; }
+
+/* Leaderboard grid */
+.leaderboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 900px) {
+  .leaderboard-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+}
+
+/* Level card */
+.level-card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1.5px solid #eee;
   overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,.04);
+  min-width: 0;
+}
+
+.level-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1.5rem;
+  border-bottom: 1.5px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.level-heading {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #2e7d32;
+}
+
+.level-chip {
+  font-size: 0.95rem;
+  color: #616161;
+  background: #f5f5f5;
+  border: 1px solid #eee;
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;      /* Prevents text from wrapping */
+  display: flex;            /* Centers text vertically */
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;          /* Optional: ensures enough space */
+  height: 32px;             /* Optional: consistent height */
+}
+
+/* Tier accent border */
+.level-bronze   .level-card__header { border-left: 8px solid #8d6e63; }
+.level-silver   .level-card__header { border-left: 8px solid #90a4ae; }
+.level-gold     .level-card__header { border-left: 8px solid #c9a227; }
+.level-platinum .level-card__header { border-left: 8px solid #90caf9; }
+
+/* Table structure */
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
 .leaderboard-header {
   display: grid;
-  grid-template-columns: 80px 2fr 1fr 1fr;
-  padding: 1rem;
-  background-color: #f5f5f5;
-  border-bottom: 1px solid #e0e0e0;
-  font-weight: 500;
-  color: #616161;
+  grid-template-columns: 70px 2fr 1fr 1fr;
+  padding: 1rem 1.5rem;
+  background: #fbfbfb;
+  border-bottom: 1.5px solid #eee;
+  font-weight: 600;
+  color: #555;
 }
 
 .leaderboard-row {
   display: grid;
-  grid-template-columns: 80px 2fr 1fr 1fr;
+  grid-template-columns: 70px 2fr 1fr 1fr;
   align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid #f0f0f0;
-  transition: background-color 0.2s;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #f5f5f5;
+  transition: background-color .15s ease;
 }
 
 .leaderboard-row:last-child {
@@ -105,44 +193,47 @@
 }
 
 .leaderboard-row:hover {
-  background-color: #f9f9f9;
+  background: #fcfdfc;
 }
 
 .leaderboard-row.current-user {
-  background-color: #f1f8e9;
+  background: #f1f8e9;
+  border-left: 4px solid #66bb6a;
 }
 
+/* Cells */
 .rank-cell {
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #757575;
 }
 
 .medal {
-  font-size: 1.8rem;
+  font-size: 1.7rem;
 }
 
 .rank-number {
-  width: 30px;
-  height: 30px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background-color: #f5f5f5;
+  background: #f3f3f3;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #666;
+  font-size: 1.1rem;
 }
 
 .user-cell {
   display: flex;
   align-items: center;
+  gap: 0.7rem;
 }
 
 .username {
-  font-weight: 500;
+  font-weight: 600;
   color: #2e7d32;
+  font-size: 1.08rem;
 }
 
 .points-cell, .streak-cell {
@@ -152,13 +243,13 @@
 }
 
 .points-value, .streak-value {
-  font-size: 1.3rem;
-  font-weight: bold;
+  font-size: 1.25rem;
+  font-weight: 800;
   color: #424242;
 }
 
 .points-label, .streak-label {
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   color: #757575;
   display: flex;
   align-items: center;
@@ -166,8 +257,10 @@
 
 .streak-flame {
   margin-left: 0.2rem;
+  font-size: 1.1rem;
 }
 
+/* States */
 .loading, .no-data, .error-message {
   text-align: center;
   padding: 2rem;
@@ -175,33 +268,44 @@
 }
 
 .error-message {
-  background-color: #ffebee;
+  background: #ffebee;
   color: #d32f2f;
   border-radius: 8px;
 }
 
-@media (max-width: 768px) {
-  .leaderboard-filters {
-    overflow-x: auto;
-    padding-bottom: 0.5rem;
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .leaderboard-header,
+  .leaderboard-row {
+    grid-template-columns: 40px 1.5fr 1fr 1fr;
+    font-size: 0.92rem;
+    padding: 0.7rem 0.7rem;
   }
-  
-  .leaderboard-header, .leaderboard-row {
-    grid-template-columns: 60px 2fr 1fr 1fr;
-    font-size: 0.9rem;
+  .level-card__header {
+    padding: 0.7rem 1rem;
   }
-  
+  .your-rank {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.7rem;
+    padding: 1rem 1rem;
+    font-size: 1rem;
+  }
+  .leaderboard-grid {
+    gap: 1rem;
+  }
   .medal {
-    font-size: 1.4rem;
+    font-size: 1.2rem;
   }
-  
   .rank-number {
-    width: 24px;
-    height: 24px;
-    font-size: 0.9rem;
+    width: 22px;
+    height: 22px;
+    font-size: 0.85rem;
   }
-  
   .points-value, .streak-value {
-    font-size: 1.1rem;
+    font-size: 1rem;
+  }
+  .username {
+    font-size: 1rem;
   }
 }

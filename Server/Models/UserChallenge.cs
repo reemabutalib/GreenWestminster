@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Server.Models;
 public class UserChallenge
 {
@@ -18,8 +20,9 @@ public class UserChallenge
     
     // Add tracking for user's progress in the challenge (0-100%)
     public int Progress { get; set; } = 0;
-    
+
     // Add property to track when user joined the challenge
+    [Column("joindate")]
     public DateTime JoinedDate { get; set; } = DateTime.UtcNow;
     
     // Add property to track challenge status as a string

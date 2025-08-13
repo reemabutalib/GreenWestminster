@@ -73,9 +73,10 @@ const HomePage = () => {
             <p>Connect with like-minded students and participate in group sustainability initiatives</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">📊</div>
-            <h3>Track Progress</h3>
-            <p>View your sustainability journey with detailed dashboards and statistics</p>
+            <div className="feature-icon">🎓</div>
+            <h3>Boost Your Employability</h3>
+            <p>  Earn points for your sustainable actions and use them towards your Westminster Employability Award.
+              </p>
           </div>
         </div>
       </section>
@@ -171,7 +172,7 @@ const HomePage = () => {
         <div className="cta-content">
           <h2>Ready to Make a Difference?</h2>
           <p>Join our growing community of environmentally conscious students and staff</p>
-          <Link to="/register" className="btn btn-primary btn-large">Join Green Westminster</Link>
+          <Link to="/register" className="btn btn-primary">Join Green Westminster</Link>
         </div>
       </section>
 
@@ -192,6 +193,16 @@ const HomePage = () => {
           </div>
         </div>
       </section>
+
+      <footer className="footer">
+  <div className="footer-links">
+    <a href="/terms" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a>
+    <a href="mailto:sustainability@westminster.ac.uk">Contact Us</a>
+  </div>
+  <div>
+    &copy; {new Date().getFullYear()} Green Westminster. All rights reserved.
+  </div>
+</footer>
     </div>
   );
 };

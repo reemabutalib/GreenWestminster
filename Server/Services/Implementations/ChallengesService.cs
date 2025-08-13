@@ -18,25 +18,43 @@ namespace Server.Services.Implementations
             _challengeRepository = challengeRepository;
         }
 
-        public async Task<IEnumerable<object>> GetChallengesAsync()
+        public async Task<IEnumerable<object>> GetChallengesAsync(int? userId = null)
         {
             var challenges = await _challengeRepository.GetAllAsync();
+
+            HashSet<int> joinedIds = userId.HasValue
+                ? challenges
+                    .Where(c => c.UserChallenges.Any(uc => uc.UserId == userId.Value))
+                    .Select(c => c.Id)
+                    .ToHashSet()
+                : new HashSet<int>();
+
             return challenges.Select(c => new
             {
                 id = c.Id,
                 title = c.Title,
                 description = c.Description,
+                category = c.Category,
                 startDate = c.StartDate,
                 endDate = c.EndDate,
                 pointsReward = c.PointsReward,
-                isActive = c.StartDate <= DateTime.UtcNow && c.EndDate >= DateTime.UtcNow
+                isActive = c.StartDate <= DateTime.UtcNow && c.EndDate >= DateTime.UtcNow,
+                hasJoined = userId.HasValue && joinedIds.Contains(c.Id)
             });
         }
 
-        public async Task<IEnumerable<object>> GetActiveChallengesAsync()
+        public async Task<IEnumerable<object>> GetActiveChallengesAsync(int? userId = null)
         {
             var challenges = await _challengeRepository.GetAllAsync();
             var currentDate = DateTime.UtcNow.Date;
+
+            HashSet<int> joinedIds = userId.HasValue
+                ? challenges
+                    .Where(c => c.UserChallenges.Any(uc => uc.UserId == userId.Value))
+                    .Select(c => c.Id)
+                    .ToHashSet()
+                : new HashSet<int>();
+
             return challenges
                 .Where(c => c.StartDate <= currentDate && c.EndDate >= currentDate)
                 .Select(c => new
@@ -44,31 +62,39 @@ namespace Server.Services.Implementations
                     id = c.Id,
                     title = c.Title,
                     description = c.Description,
+                    category = c.Category,
                     startDate = c.StartDate,
                     endDate = c.EndDate,
-                    pointsReward = c.PointsReward
+                    pointsReward = c.PointsReward,
+                    hasJoined = userId.HasValue && joinedIds.Contains(c.Id)
                 });
         }
 
-        public async Task<object?> GetChallengeByIdAsync(int id)
+        public async Task<object?> GetChallengeByIdAsync(int id, int? userId = null)
         {
             var c = await _challengeRepository.GetByIdAsync(id);
             if (c == null) return null;
+
+            bool hasJoined = userId.HasValue && c.UserChallenges.Any(uc => uc.UserId == userId.Value);
+
             return new
             {
                 id = c.Id,
                 title = c.Title,
                 description = c.Description,
+                category = c.Category,
                 startDate = c.StartDate,
                 endDate = c.EndDate,
                 pointsReward = c.PointsReward,
-                isActive = c.StartDate <= DateTime.UtcNow && c.EndDate >= DateTime.UtcNow
+                isActive = c.StartDate <= DateTime.UtcNow && c.EndDate >= DateTime.UtcNow,
+                hasJoined
             };
         }
 
         public async Task<IEnumerable<object>> GetUserChallengesAsync(int userId)
         {
             var challenges = await _challengeRepository.GetAllAsync();
+
             return challenges
                 .SelectMany(c => c.UserChallenges
                     .Where(uc => uc.UserId == userId)
@@ -77,19 +103,21 @@ namespace Server.Services.Implementations
                         id = c.Id,
                         title = c.Title,
                         description = c.Description,
+                        category = c.Category,
                         startDate = c.StartDate,
                         endDate = c.EndDate,
                         pointsReward = c.PointsReward,
                         progress = uc.Progress,
                         status = uc.Status,
-                        joinedDate = uc.JoinedDate
+                        joinedDate = uc.JoinedDate,
+                        hasJoined = true
                     }))
                 .ToList();
         }
 
         public async Task<object> CreateChallengeAsync(Challenge challenge)
         {
-            // Remove invalid navigation reference
+            // Ensure no accidental navigation graph insert
             challenge.Activities = null;
 
             await _challengeRepository.AddAsync(challenge);
@@ -99,6 +127,7 @@ namespace Server.Services.Implementations
                 id = challenge.Id,
                 title = challenge.Title,
                 description = challenge.Description,
+                category = challenge.Category,
                 startDate = challenge.StartDate,
                 endDate = challenge.EndDate,
                 pointsReward = challenge.PointsReward
@@ -106,34 +135,39 @@ namespace Server.Services.Implementations
         }
 
         public async Task<bool> JoinChallengeAsync(int challengeId, int userId)
-{
-    var challenge = await _challengeRepository.GetByIdAsync(challengeId);
-    if (challenge == null) return false;
+        {
+            var challenge = await _challengeRepository.GetByIdAsync(challengeId);
+            if (challenge == null) return false;
 
-    if (challenge.UserChallenges.Any(uc => uc.UserId == userId))
-        return false;
+            if (challenge.UserChallenges.Any(uc => uc.UserId == userId))
+                return false;
 
-   var userChallenge = new UserChallenge
-{
-    UserId = userId,
-    ChallengeId = challengeId,
-    JoinedDate = DateTime.UtcNow,
-    Progress = 0,
-    Status = "In Progress",
-    Completed = false
-};
+            var userChallenge = new UserChallenge
+            {
+                UserId = userId,
+                ChallengeId = challengeId,
+                JoinedDate = DateTime.UtcNow,
+                Progress = 0,
+                Status = "In Progress",
+                Completed = false
+            };
 
-await _challengeRepository.AddUserChallengeAsync(userChallenge);
+            await _challengeRepository.AddUserChallengeAsync(userChallenge);
+            return true;
+        }
 
-
-    return true;
-}
-
-
-        public async Task<IEnumerable<object>> GetPastChallengesAsync()
+        public async Task<IEnumerable<object>> GetPastChallengesAsync(int? userId = null)
         {
             var challenges = await _challengeRepository.GetAllAsync();
             var currentDate = DateTime.UtcNow.Date;
+
+            HashSet<int> joinedIds = userId.HasValue
+                ? challenges
+                    .Where(c => c.UserChallenges.Any(uc => uc.UserId == userId.Value))
+                    .Select(c => c.Id)
+                    .ToHashSet()
+                : new HashSet<int>();
+
             return challenges
                 .Where(c => c.EndDate < currentDate)
                 .Select(c => new
@@ -144,7 +178,8 @@ await _challengeRepository.AddUserChallengeAsync(userChallenge);
                     category = c.Category,
                     startDate = c.StartDate,
                     endDate = c.EndDate,
-                    pointsReward = c.PointsReward
+                    pointsReward = c.PointsReward,
+                    hasJoined = userId.HasValue && joinedIds.Contains(c.Id)
                 });
         }
 
@@ -152,28 +187,28 @@ await _challengeRepository.AddUserChallengeAsync(userChallenge);
         {
             if (id != challenge.Id) return null;
 
-            var existingChallenge = await _challengeRepository.GetByIdAsync(id);
-            if (existingChallenge == null) return null;
+            var existing = await _challengeRepository.GetByIdAsync(id);
+            if (existing == null) return null;
 
-            existingChallenge.Title = challenge.Title;
-            existingChallenge.Description = challenge.Description;
-            existingChallenge.StartDate = challenge.StartDate;
-            existingChallenge.EndDate = challenge.EndDate;
-            existingChallenge.PointsReward = challenge.PointsReward;
-            existingChallenge.Category = challenge.Category;
+            existing.Title = challenge.Title;
+            existing.Description = challenge.Description;
+            existing.StartDate = challenge.StartDate;
+            existing.EndDate = challenge.EndDate;
+            existing.PointsReward = challenge.PointsReward;
+            existing.Category = challenge.Category;
 
-            await _challengeRepository.UpdateAsync(existingChallenge);
+            await _challengeRepository.UpdateAsync(existing);
 
             return new
             {
-                id = existingChallenge.Id,
-                title = existingChallenge.Title,
-                description = existingChallenge.Description,
-                startDate = existingChallenge.StartDate,
-                endDate = existingChallenge.EndDate,
-                pointsReward = existingChallenge.PointsReward,
-                category = existingChallenge.Category,
-                isActive = existingChallenge.StartDate <= DateTime.UtcNow && existingChallenge.EndDate >= DateTime.UtcNow
+                id = existing.Id,
+                title = existing.Title,
+                description = existing.Description,
+                startDate = existing.StartDate,
+                endDate = existing.EndDate,
+                pointsReward = existing.PointsReward,
+                category = existing.Category,
+                isActive = existing.StartDate <= DateTime.UtcNow && existing.EndDate >= DateTime.UtcNow
             };
         }
 
@@ -237,19 +272,15 @@ await _challengeRepository.AddUserChallengeAsync(userChallenge);
         }
 
         public async Task<bool> AddActivitiesToChallengeAsync(int challengeId, List<int> activityIds)
-{
-    var challenge = await _challengeRepository.GetByIdAsync(challengeId);
-    if (challenge == null) return false;
+        {
+            var challenge = await _challengeRepository.GetByIdAsync(challengeId);
+            if (challenge == null) return false;
 
-    // Optional: clear existing activities first
-    // challenge.Activities.Clear();
+            // You can wire up activityIds → navigation here later if needed.
+            challenge.Activities = null;
 
-    // Since you're avoiding includes on Activities, we don't load them — just null it out or fetch if needed
-    challenge.Activities = null;
-
-    await _challengeRepository.UpdateAsync(challenge);
-    return true;
-}
-
+            await _challengeRepository.UpdateAsync(challenge);
+            return true;
+        }
     }
 }

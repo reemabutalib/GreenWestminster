@@ -59,67 +59,58 @@ namespace Server.Controllers
         [HttpGet("activity-completions")]
         [Authorize(Policy = "AdminPolicy")]
         public async Task<IActionResult> GetActivityCompletions(
-            [FromQuery] DateTime? startDate = null,
-            [FromQuery] DateTime? endDate = null,
-            [FromQuery] string? reviewStatus = null)
+    [FromQuery] DateTime? startDate = null,
+    [FromQuery] DateTime? endDate = null,
+    [FromQuery] string? reviewStatus = null)
         {
             try
             {
                 _logger.LogInformation("Admin fetching activity completions");
 
-                if (_context == null)
-                {
-                    _logger.LogError("_context is null in AdminController");
-                    return StatusCode(500, new { message = "Database context not initialized" });
-                }
+                var baseUrl = (Request?.Scheme != null && Request?.Host.HasValue == true)
+                    ? $"{Request.Scheme}://{Request.Host}"
+                    : "http://localhost:80";
 
                 var query = _context.ActivityCompletions
                     .Include(ac => ac.User)
                     .Include(ac => ac.Activity)
-                    .Where(ac => ac.User.Username != "sustainabilityteam") // Filter here
+                    .AsNoTracking()
                     .AsQueryable();
 
-                if (reviewStatus != null)
-                {
+                // null-safe filter: exclude sustainabilityteam only when User exists
+                query = query.Where(ac => ac.User == null || ac.User.Username != "sustainabilityteam");
+
+                if (!string.IsNullOrWhiteSpace(reviewStatus))
                     query = query.Where(ac => ac.ReviewStatus == reviewStatus);
-                }
 
                 if (startDate.HasValue)
-                {
                     query = query.Where(ac => ac.CompletedAt >= startDate.Value);
-                }
 
                 if (endDate.HasValue)
-                {
                     query = query.Where(ac => ac.CompletedAt <= endDate.Value);
-                }
 
                 var completions = await query
                     .OrderByDescending(ac => ac.CompletedAt)
+                    .Select(ac => new
+                    {
+                        id = ac.Id,
+                        userId = ac.UserId,
+                        activityId = ac.ActivityId,
+                        username = ac.User != null ? ac.User.Username : "Unknown",
+                        activityTitle = ac.Activity != null ? ac.Activity.Title : "Unknown",
+                        completedAt = ac.CompletedAt,
+                        imagePath = ac.ImagePath,
+                        imageUrl = !string.IsNullOrWhiteSpace(ac.ImagePath)
+                            ? $"{baseUrl}/uploads/{ac.ImagePath.Trim()}"
+                            : null,
+                        notes = ac.Notes,
+                        pointsEarned = ac.PointsEarned,
+                        reviewStatus = ac.ReviewStatus,
+                        adminNotes = ac.AdminNotes
+                    })
                     .ToListAsync();
 
-                var baseUrl = Request?.Scheme != null && Request?.Host.HasValue == true
-                    ? $"{Request.Scheme}://{Request.Host}"
-                    : "http://localhost";
-
-                var result = completions.Select(ac => new
-                {
-                    id = ac.Id,
-                    userId = ac.UserId,
-                    activityId = ac.ActivityId,
-                    username = ac.User?.Username ?? "Unknown",
-                    activityTitle = ac.Activity?.Title ?? "Unknown",
-                    completedAt = ac.CompletedAt,
-                    imageUrl = !string.IsNullOrEmpty(ac.ImagePath)
-                        ? $"{baseUrl}/uploads/{ac.ImagePath}"
-                        : null,
-                    notes = ac.Notes,
-                    pointsEarned = ac.PointsEarned,
-                    reviewStatus = ac.ReviewStatus,
-                    adminNotes = ac.AdminNotes
-                });
-
-                return Ok(result);
+                return Ok(completions);
             }
             catch (Exception ex)
             {
@@ -127,9 +118,12 @@ namespace Server.Controllers
                 return StatusCode(500, new
                 {
                     message = "An error occurred while retrieving activity completions.",
-                    error = ex.Message
+                    error = ex.Message,
+                    inner = ex.InnerException?.Message
                 });
             }
+
         }
+
     }
 }

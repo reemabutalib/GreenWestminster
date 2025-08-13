@@ -29,7 +29,7 @@ public class UsersController : ControllerBase
         return Ok(users);
     }
 
-    [HttpGet("{id}")]
+[HttpGet("{id}")]
 public async Task<ActionResult<UserDto>> GetUser(int id)
 {
     var user = await _userService.GetUserAsync(id);
@@ -49,7 +49,8 @@ public async Task<ActionResult<UserDto>> GetUser(int id)
         LastActivityDate = user.LastActivityDate,
         Course = user.Course,
         YearOfStudy = user.YearOfStudy,
-        AccommodationType = user.AccommodationType
+        AccommodationType = user.AccommodationType,
+        JoinDate = user.JoinDate
     };
 
     return Ok(dto);
@@ -122,16 +123,6 @@ public async Task<ActionResult<UserDto>> GetUser(int id)
         return Ok(status);
     }
 
-    // POST: api/users/5/completeActivity/3
-    [HttpPost("{userId}/completeActivity/{activityId}")]
-    public async Task<ActionResult<ActivityCompletion>> CompleteActivity(int userId, int activityId)
-    {
-        var completion = await _userService.CompleteActivityAsync(userId, activityId);
-        if (completion == null)
-            return BadRequest("Activity already completed today or user/activity not found");
-        return CreatedAtAction(nameof(GetUser), new { id = userId }, completion);
-    }
-
     // GET: api/users/{userId}/activity-stats
     [HttpGet("{userId}/activity-stats")]
     public async Task<ActionResult<object>> GetActivityStats(int userId)
@@ -139,6 +130,7 @@ public async Task<ActionResult<UserDto>> GetUser(int id)
         var stats = await _userService.GetActivityStatsAsync(userId);
         if (stats == null)
             return NotFound("User not found");
+            
         return Ok(stats);
     }
 

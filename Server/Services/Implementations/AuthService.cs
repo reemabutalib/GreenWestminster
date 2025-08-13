@@ -1,37 +1,41 @@
 using Server.Data;
 using Server.Models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Identity;
-using System.Linq;
 using Server.Services.Interfaces;
-using BC = BCrypt.Net.BCrypt;
 using Server.DTOs;
 using Server.Repositories.Interfaces;
+using BC = BCrypt.Net.BCrypt;
 
 namespace Server.Services.Implementations
 {
     public class AuthService : IAuthService
     {
         private readonly IUserRepository _userRepository;
+        private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly UserManager<IdentityUser> _userManager;
 
         public AuthService(
             IUserRepository userRepository,
+            AppDbContext context,
             IConfiguration configuration,
             RoleManager<IdentityRole> roleManager,
             UserManager<IdentityUser> userManager)
         {
             _userRepository = userRepository;
+            _context = context;
             _configuration = configuration;
             _roleManager = roleManager;
             _userManager = userManager;
@@ -42,9 +46,7 @@ namespace Server.Services.Implementations
             if (await _userRepository.GetByEmailAsync(registerDto.Email) != null)
                 return (false, "Email is already registered", null, null);
 
-            var existingUserByUsername = (await _userRepository.GetAllAsync())
-                .FirstOrDefault(u => u.Username == registerDto.Username);
-            if (existingUserByUsername != null)
+            if ((await _userRepository.GetAllAsync()).Any(u => u.Username == registerDto.Username))
                 return (false, "Username is already taken", null, null);
 
             var user = new User
@@ -61,55 +63,51 @@ namespace Server.Services.Implementations
 
             await _userRepository.AddAsync(user);
 
-            if (_userManager != null)
+            // Also create IdentityUser for roles
+            var identityUser = new IdentityUser
             {
-                var identityUser = new IdentityUser
-                {
-                    UserName = registerDto.Email,
-                    Email = registerDto.Email,
-                    EmailConfirmed = true
-                };
-                var result = await _userManager.CreateAsync(identityUser, registerDto.Password);
-                // Optionally handle result
-            }
+                UserName = registerDto.Email,
+                Email = registerDto.Email,
+                EmailConfirmed = true
+            };
+            await _userManager.CreateAsync(identityUser, registerDto.Password);
 
             return (true, "Registration successful", user.Id, user.Username);
         }
 
-        public async Task<(bool Success, string Message, string? Token, int? UserId, string? Username, string? Email, IList<string>? Roles)> LoginAsync(LoginDto loginDto)
+        public async Task<(bool Success, string Message, string? Token, string? RefreshToken, int? UserId, string? Username, string? Email, IList<string>? Roles)> LoginAsync(LoginDto loginDto)
         {
             var user = await _userRepository.GetByEmailAsync(loginDto.Email);
             if (user == null)
-                return (false, "Invalid email or password", null, null, null, null, null);
+                return (false, "Invalid email or password", null, null, null, null, null, null);
 
-            bool validPassword = false;
-            try
-            {
-                validPassword = BC.Verify(loginDto.Password, user.Password);
-            }
-            catch
-            {
-                if (loginDto.Password == user.Password)
-                {
-                    user.Password = BC.HashPassword(loginDto.Password);
-                    await _userRepository.UpdateAsync(user);
-                    validPassword = true;
-                }
-            }
-
-            if (!validPassword)
-                return (false, "Invalid email or password", null, null, null, null, null);
+            if (!BC.Verify(loginDto.Password, user.Password))
+                return (false, "Invalid email or password", null, null, null, null, null, null);
 
             var roles = await GetUserRolesAsync(user.Email);
-            var token = await GenerateJwtTokenAsync(user, roles);
 
-            return (true, "Login successful", token, user.Id, user.Username, user.Email, roles);
+            var jwtToken = await GenerateJwtTokenAsync(user, roles);
+            var refreshToken = GenerateRefreshToken();
+
+            _context.RefreshTokens.Add(new RefreshToken
+            {
+                UserId = user.Id,
+                Token = refreshToken,
+                Expires = DateTime.UtcNow.AddDays(7),
+                Created = DateTime.UtcNow,
+                IsRevoked = false
+            });
+
+            await _context.SaveChangesAsync();
+
+            return (true, "Login successful", jwtToken, refreshToken, user.Id, user.Username, user.Email, roles);
         }
 
         public async Task<object?> GetUserInfoAsync(int userId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) return null;
+
             var roles = await GetUserRolesAsync(user.Email);
 
             return new
@@ -125,7 +123,7 @@ namespace Server.Services.Implementations
                 maxStreak = user.MaxStreak,
                 joinDate = user.JoinDate,
                 lastActivityDate = user.LastActivityDate,
-                roles = roles
+                roles
             };
         }
 
@@ -147,7 +145,7 @@ namespace Server.Services.Implementations
                     userId = userIdClaim?.Value,
                     username = userNameClaim?.Value,
                     email = userEmailClaim?.Value,
-                    roles = roles,
+                    roles,
                     isAdmin = user.IsInRole("Admin")
                 });
             }
@@ -159,48 +157,69 @@ namespace Server.Services.Implementations
 
         public async Task<IList<string>> GetUserRolesAsync(string email)
         {
-            var userRoles = new List<string>();
-            if (_userManager != null)
-            {
-                var identityUser = await _userManager.FindByEmailAsync(email);
-                if (identityUser != null)
-                {
-                    userRoles = (await _userManager.GetRolesAsync(identityUser)).ToList();
-                }
-            }
-            // Optionally add direct DB lookup fallback here if needed
-            return userRoles;
+            var identityUser = await _userManager.FindByEmailAsync(email);
+            return identityUser != null ? await _userManager.GetRolesAsync(identityUser) : new List<string>();
         }
 
         public async Task<string> GenerateJwtTokenAsync(User user, IList<string> roles)
         {
-            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT key is not configured"));
-
+            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]);
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
                 new Claim(ClaimTypes.Email, user.Email)
             };
-
             foreach (var role in roles)
-            {
                 claims.Add(new Claim(ClaimTypes.Role, role));
-            }
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddDays(7),
-                SigningCredentials = new SigningCredentials(
-                    new SymmetricSecurityKey(key),
-                    SecurityAlgorithms.HmacSha256Signature)
+                Expires = DateTime.UtcNow.AddHours(1),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();
-            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(tokenHandler.CreateToken(tokenDescriptor));
+        }
 
-            return tokenHandler.WriteToken(token);
+        public string GenerateRefreshToken()
+        {
+            var randomBytes = RandomNumberGenerator.GetBytes(64);
+            return Convert.ToBase64String(randomBytes);
+        }
+
+        public async Task<(bool Success, string? NewJwt, string? NewRefreshToken)> RefreshTokenAsync(string refreshToken)
+        {
+            var storedToken = await _context.RefreshTokens
+                .FirstOrDefaultAsync(t => t.Token == refreshToken && !t.IsRevoked);
+
+            if (storedToken == null || storedToken.Expires < DateTime.UtcNow)
+                return (false, null, null);
+
+            var user = await _context.Users.FindAsync(storedToken.UserId);
+            if (user == null)
+                return (false, null, null);
+
+            var roles = await GetUserRolesAsync(user.Email);
+            var newJwt = await GenerateJwtTokenAsync(user, roles);
+
+            storedToken.IsRevoked = true;
+
+            var newRefreshToken = GenerateRefreshToken();
+            _context.RefreshTokens.Add(new RefreshToken
+            {
+                UserId = user.Id,
+                Token = newRefreshToken,
+                Expires = DateTime.UtcNow.AddDays(7),
+                Created = DateTime.UtcNow,
+                IsRevoked = false
+            });
+
+            await _context.SaveChangesAsync();
+
+            return (true, newJwt, newRefreshToken);
         }
     }
 }

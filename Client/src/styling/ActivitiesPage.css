@@ -244,3 +244,11 @@
 .frequency-btn.active:hover {
   background-color: #236741;
 }
+
+.image-guidance {
+  display: block;
+  color: #388e3c;
+  font-size: 0.97rem;
+  margin-top: 0.3rem;
+  margin-bottom: 0.5rem;
+}

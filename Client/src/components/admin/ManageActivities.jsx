@@ -117,21 +117,24 @@ const ManageActivities = () => {
   };
 
   const handleDeleteActivity = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this activity?')) {
-      return;
-    }
-    
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:80/api/activities/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchActivities();
-    } catch (err) {
-      setError('Failed to delete activity');
-      console.error(err);
-    }
-  };
+  if (!window.confirm('Are you sure you want to delete this activity?')) return;
+
+  try {
+    const token = localStorage.getItem('token');
+    await axios.delete('http://localhost:80/api/activities', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: { id } // <<< IMPORTANT: body for DELETE
+    });
+    fetchActivities();
+  } catch (err) {
+    setError('Failed to delete activity');
+    console.error(err);
+  }
+};
+
 
   const handleCancelEdit = () => {
     setEditingActivity(null);
@@ -180,7 +183,10 @@ const ManageActivities = () => {
         </div>
         
         <div className="form-group">
-          <label htmlFor="pointsValue">Points</label>
+          <label htmlFor="pointsValue">Estimated Points</label>
+          <small style={{ display: 'block', color: '#666', marginTop: '4px', marginBottom: '6px' }}>
+            This number is dependent on the quantity that the user submits.
+          </small>
           <input
             type="number"
             id="pointsValue"

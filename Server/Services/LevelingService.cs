@@ -5,55 +5,66 @@ namespace Server.Services
 {
     public class LevelingService
     {
-        // Define the points thresholds for each level
-        private static readonly Dictionary<int, int> LevelThresholds = new Dictionary<int, int>
+        private static readonly List<(string Level, int Threshold)> OrderedLevels = new List<(string, int)>
         {
-            { 1, 0 },     // Level 1 starts at 0 points
-            { 2, 100 },   // Level 2 requires 100 points
-            { 3, 250 },   // Level 3 requires 250 points
-            { 4, 500 },   // Level 4 requires 500 points
-            { 5, 1000 }   // Level 5 requires 1000 points
+            ("Bronze", 0),
+            ("Silver", 500),
+            ("Gold", 1000),
+            ("Platinum", 5000)
         };
 
-        // Calculate the level based on points
-        public static int CalculateLevel(int points)
+        public static string CalculateLevel(int points)
         {
-            int level = 1; // Default level
-            
-            foreach (var threshold in LevelThresholds)
+            string level = "Bronze";
+            foreach (var entry in OrderedLevels)
             {
-                if (points >= threshold.Value)
+                if (points >= entry.Threshold)
                 {
-                    level = threshold.Key;
+                    level = entry.Level;
                 }
                 else
                 {
                     break;
                 }
             }
-            
             return level;
         }
-        
+
+
         // Calculate points needed for the next level
         public static int PointsToNextLevel(int currentPoints)
         {
-            int currentLevel = CalculateLevel(currentPoints);
-            int nextLevel = currentLevel + 1;
-            
-            // If we're at the max level, return 0
-            if (!LevelThresholds.ContainsKey(nextLevel))
+            foreach (var entry in OrderedLevels)
             {
-                return 0;
+                if (currentPoints < entry.Threshold)
+                {
+                    return entry.Threshold - currentPoints;
+                }
             }
-            
-            return LevelThresholds[nextLevel] - currentPoints;
+            // If at max level, return 0
+            return 0;
         }
-        
+
         // Get the total points needed for a specific level
-        public static int GetPointsForLevel(int level)
+        public static int GetPointsForLevel(string level)
         {
-            return LevelThresholds.ContainsKey(level) ? LevelThresholds[level] : -1;
+            foreach (var entry in OrderedLevels)
+            {
+                if (entry.Level == level)
+                    return entry.Threshold;
+            }
+            return -1;
+        }
+
+        // Get all levels in order
+        public static List<string> GetAllLevels()
+        {
+            var levels = new List<string>();
+            foreach (var entry in OrderedLevels)
+            {
+                levels.Add(entry.Level);
+            }
+            return levels;
         }
     }
 }

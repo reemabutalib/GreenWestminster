@@ -15,6 +15,7 @@ import Register from './components/auth/Register';
 import EventsPage from './components/EventsPage';
 import AboutUs from './components/AboutUs';
 import AvatarCustomizer from './components/AvatarCustomizer';
+import TermsAndConditions from './components/TermsAndConditions';
 
 // Import admin components
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -76,6 +77,7 @@ function AppContent() {
             <Route path="/events" element={<EventsPage />} />
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/about-us" element={<AboutUs />} />
+            <Route path="/terms" element={<TermsAndConditions />} />
             
             {/* Protected routes */}
             <Route path="/dashboard" element={

@@ -1,6 +1,7 @@
-using System.Threading.Tasks;
 using Server.Models;
-using Server.DTOs;
+using Microsoft.AspNetCore.Http;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Server.Services.Interfaces
 {
@@ -16,6 +17,10 @@ namespace Server.Services.Interfaces
         Task<bool> UpdateActivityAsync(SustainableActivity activity);
         Task<bool> DeleteActivityAsync(int id);
         Task<bool> ActivityExists(int id);
-        Task<List<ActivityCompletion>> GetCompletionsForUserAsync(int userId);
+
+        Task<List<ActivityCompletion>> GetUserCompletionsAsync(int userId);
+        Task<List<ActivityCompletion>> GetPendingCompletionsForUserAsync(int userId);
+        Task<(bool Success, string Message, ActivityCompletion? Completion)> ResubmitActivityAsync(
+            int completionId, int userId, string? notes, IFormFile? image);
     }
 }
