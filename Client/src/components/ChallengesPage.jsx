@@ -154,8 +154,6 @@ const ChallengesPage = () => {
             </div>
 
             <div className="challenge-actions">
-              <Link to={`/challenges/${challenge.id}`} className="details-btn">View Details</Link>
-
               {activeTab === 'active' && !challenge.hasJoined && (
                 <button
                   className="join-btn"

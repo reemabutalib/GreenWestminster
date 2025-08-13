@@ -152,10 +152,83 @@
   border-radius: 6px;
   font-weight: 500;
   text-transform: uppercase;
+}/* Estimated points state */
+.points-estimated .points-value::before {
+  content: '≈';
+  margin-right: 2px;
+  opacity: 0.8;
 }
+
+/* Guidance note */
+.est-note {
+  margin-top: -0.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: #455a64;             /* readable on white */
+  background: #f1f8e9;        /* gentle green hint */
+  border: 1px dashed #c8e6c9;
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.est-icon {
+  line-height: 1;
+  margin-top: 1px;
+  flex: 0 0 auto;
+  filter: saturate(0.6);
+}
+
+/* Keep spacing tidy on small screens */
+@media (max-width: 768px) {
+  .est-note {
+    font-size: 0.82rem;
+  }
+}
+
 
 .activity-card.completed {
   background-color: #fffde7;
   border: 1px solid #fbc02d;
+}
+
+/* Estimated points state */
+.points-estimated .points-value::before {
+  content: '≈';
+  margin-right: 2px;
+  opacity: 0.8;
+}
+
+/* Guidance note */
+.est-note {
+  margin-top: -0.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: #455a64;             /* readable on white */
+  background: #f1f8e9;        /* gentle green hint */
+  border: 1px dashed #c8e6c9;
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.est-icon {
+  line-height: 1;
+  margin-top: 1px;
+  flex: 0 0 auto;
+  filter: saturate(0.6);
+}
+
+/* Keep spacing tidy on small screens */
+@media (max-width: 768px) {
+  .est-note {
+    font-size: 0.82rem;
+  }
 }
 

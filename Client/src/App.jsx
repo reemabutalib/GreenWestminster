@@ -7,7 +7,6 @@ import Navigation from './components/Navigation';
 import Dashboard from './components/Dashboard';
 import ActivitiesPage from './components/ActivitiesPage';
 import ChallengesPage from './components/ChallengesPage';
-import ChallengeDetails from './components/ChallengeDetails';
 import LeaderboardPage from './components/LeaderboardPage';
 import ProfilePage from './components/ProfilePage';
 import Login from './components/auth/Login';
@@ -95,11 +94,7 @@ function AppContent() {
                 <ChallengesPage />
               </ProtectedRoute>
             } />
-            <Route path="/challenges/:id" element={
-              <ProtectedRoute>
-                <ChallengeDetails />
-              </ProtectedRoute>
-            } />
+          
             <Route path="/profile" element={
               <ProtectedRoute>
                 <ProfilePage />
