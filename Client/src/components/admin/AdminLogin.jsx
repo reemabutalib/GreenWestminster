@@ -11,15 +11,21 @@ const AdminLogin = () => {
   const { login } = useAuth(); // <-- get login from context
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    const result = await login(email, password); // <-- use context login
-    if (result.success) {
+  e.preventDefault();
+  setError('');
+  const result = await login(email, password); // <-- use context login
+
+  if (result.success) {
+    // Check if user is admin
+    if (result.userRole === 'Admin') {
       navigate('/admin/dashboard');
     } else {
-      setError(result.error || 'Invalid admin credentials');
+      setError("You don't have access to this page as you are not an admin.");
     }
-  };
+  } else {
+    setError(result.error || 'Invalid admin credentials');
+  }
+};
 
   return (
     <div className="login-container">

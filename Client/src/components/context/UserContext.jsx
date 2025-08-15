@@ -104,7 +104,8 @@ export const AuthProvider = ({ children }) => {
 
     setCurrentUser(userObj);
 
-    return { success: true };
+    // Return role and other info for downstream checks
+    return { success: true, userRole: userObj.role, user: userObj };
   } catch (error) {
     setAuthError(error.message);
     setCurrentUser(null);
