@@ -153,6 +153,9 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Fallback to index.html for client-side routing (React)
+app.MapFallbackToFile("index.html");
+
 // Weather forecast sample endpoint
 app.MapGet("/weatherforecast", () =>
 {
