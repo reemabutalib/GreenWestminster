@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -15,27 +16,22 @@ using Server.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ---------- Services ----------
+// ---------------- Services ----------------
 
-// Controllers & minimal OpenAPI (Swagger only in dev)
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Logging (console/debug is fine; keep noise low in prod)
-builder.Services.AddLogging();
+// DbContext (pooled)
+builder.Services.AddDbContextPool<AppDbContext>(opts =>
+    opts.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// DbContext *pooling* + Npgsql
-builder.Services.AddDbContextPool<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// ASP.NET Identity
-builder.Services
-    .AddIdentity<IdentityUser, IdentityRole>()
+// Identity
+builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
-// App services & repos
+// DI
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
@@ -50,13 +46,12 @@ builder.Services.AddScoped<IChallengeRepository, ChallengeRepository>();
 builder.Services.AddScoped<ISustainableActivityRepository, SustainableActivityRepository>();
 builder.Services.AddScoped<ISustainableEventRepository, SustainableEventRepository>();
 
-// Outbound HTTP client(s) with sensible timeouts
 builder.Services.AddHttpClient<IClimatiqService, ClimatiqService>(c =>
 {
     c.Timeout = TimeSpan.FromSeconds(10);
 });
 
-// CORS — cache preflight to avoid OPTIONS on every call
+// CORS — allow your client and cache the preflight
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
@@ -72,19 +67,28 @@ builder.Services.AddCors(options =>
     });
 });
 
-// JWT auth
+// Process proxy headers from Render so the app knows the original scheme = https
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor;
+    // trust Render's proxy (we don't know its IPs here), so clear the defaults:
+    o.KnownNetworks.Clear();
+    o.KnownProxies.Clear();
+});
+
+// JWT
 var requireHttps = !builder.Environment.IsDevelopment();
-builder.Services.AddAuthentication(options =>
+builder.Services.AddAuthentication(o =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultScheme             = JwtBearerDefaults.AuthenticationScheme;
+    o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    o.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
+    o.DefaultScheme             = JwtBearerDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options =>
+.AddJwtBearer(o =>
 {
-    options.SaveToken = true;
-    options.RequireHttpsMetadata = requireHttps;
-    options.TokenValidationParameters = new TokenValidationParameters
+    o.SaveToken = true;
+    o.RequireHttpsMetadata = requireHttps;
+    o.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer           = false,
         ValidateAudience         = false,
@@ -93,46 +97,44 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey         = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]
                 ?? throw new InvalidOperationException("JWT key is not configured"))),
-
-        // Make sure roles resolve correctly
         RoleClaimType = ClaimTypes.Role
     };
-
-    // Return 401 JSON instead of redirect
-    options.Events = new JwtBearerEvents
+    o.Events = new JwtBearerEvents
     {
-        OnChallenge = context =>
+        OnChallenge = ctx =>
         {
-            context.HandleResponse();
-            context.Response.StatusCode = 401;
-            context.Response.ContentType = "application/json";
-            return context.Response.WriteAsync("""{"message":"You are not authorized"}""");
+            ctx.HandleResponse();
+            ctx.Response.StatusCode  = 401;
+            ctx.Response.ContentType = "application/json";
+            return ctx.Response.WriteAsync("""{"message":"You are not authorized"}""");
         }
     };
 });
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("AdminPolicy", policy =>
-        policy.RequireAssertion(ctx =>
+    options.AddPolicy("AdminPolicy", p =>
+        p.RequireAssertion(ctx =>
             ctx.User.HasClaim(c => (c.Type == ClaimTypes.Role && c.Value == "Admin")
                                 || (c.Type == "role"        && c.Value == "Admin"))));
 });
 
-// Response compression (helps those post-login JSON calls)
+// Response compression for JSON
 builder.Services.AddResponseCompression(o =>
 {
     o.EnableForHttps = true;
-    o.Providers.Add<GzipCompressionProvider>();
     o.MimeTypes = ResponseCompressionDefaults.MimeTypes
         .Concat(new[] { "application/json" });
 });
 
-// ---------- App ----------
-
 var app = builder.Build();
 
-// Server-Timing: see total backend time in the browser’s Network → Timing
+// ---------------- Middleware order (important) ----------------
+
+// Process X-Forwarded-* from Render BEFORE anything that uses scheme/host
+app.UseForwardedHeaders();
+
+// Server-Timing so you can see backend time in DevTools
 app.Use(async (ctx, next) =>
 {
     var sw = Stopwatch.StartNew();
@@ -141,7 +143,6 @@ app.Use(async (ctx, next) =>
     ctx.Response.Headers.Append("Server-Timing", $"app;dur={sw.ElapsedMilliseconds}");
 });
 
-// Swagger only in dev
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -149,8 +150,14 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseResponseCompression();
+
+// Routing → CORS → Auth → Authorization → Endpoints
+app.UseRouting();
 app.UseCors("AllowReactApp");
 
+// IMPORTANT on Render: don't force HTTPS redirect unless ForwardedHeaders is in place.
+// If you prefer to keep it, it must be AFTER UseForwardedHeaders (we did that) and BEFORE UseRouting.
+// To avoid preflight redirects entirely, you can also comment the next line out.
 if (requireHttps)
 {
     app.UseHttpsRedirection();
@@ -161,38 +168,35 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Health endpoints (good for uptime pings / cold-starts)
+// Health checks (handy for warmers)
 app.MapGet("/healthz", () => Results.Ok(new { ok = true, time = DateTime.UtcNow }));
 app.MapGet("/healthz/db", async (AppDbContext db) =>
     await db.Database.CanConnectAsync() ? Results.Ok(new { ok = true }) : Results.Problem("db unreachable"));
 
-// Bind to Render’s provided PORT if present (more robust than forcing :80)
+// Bind to Render's PORT
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrWhiteSpace(port))
 {
     app.Urls.Add($"http://0.0.0.0:{port}");
 }
 
-// Apply migrations & warm the EF model/connection pool before serving traffic
+// Apply migrations & warm EF
 await InitializeDatabaseAsync(app);
 
 await app.RunAsync();
 
-
-// ---------- Helpers ----------
-
 static async Task InitializeDatabaseAsync(WebApplication app)
 {
     using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var db     = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
     try
     {
         logger.LogInformation("Applying migrations…");
         await db.Database.MigrateAsync();
 
-        // Warm up: build EF model & open a pooled connection
+        // Warm-up query builds EF model & opens a pooled connection
         _ = await db.Users.AsNoTracking().AnyAsync();
 
         logger.LogInformation("Database ready.");
