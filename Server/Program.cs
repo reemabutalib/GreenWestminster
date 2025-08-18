@@ -1,46 +1,41 @@
-using Server.Data;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using Microsoft.AspNetCore.Identity;
-using System.Text.Json;
-using Server.Models;
+using System.Diagnostics;
 using System.Security.Claims;
-using Server.DTOs;
-using Server.Services.Interfaces;
-using Server.Services.Implementations;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+
+using Server.Data;
 using Server.Repositories;
 using Server.Repositories.Interfaces;
-using Microsoft.Extensions.FileProviders;
-using System.IO;
+using Server.Services.Implementations;
+using Server.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container
+// ---------- Services ----------
+
+// Controllers & minimal OpenAPI (Swagger only in dev)
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configure logging
-builder.Services.AddLogging(logging =>
-{
-    logging.AddConsole();
-    logging.AddDebug();
-    // Enable detailed CORS logs for debugging
-    logging.AddFilter("Microsoft.AspNetCore.Cors", LogLevel.Debug);
-});
+// Logging (console/debug is fine; keep noise low in prod)
+builder.Services.AddLogging();
 
-// Add database context
-builder.Services.AddDbContext<AppDbContext>(options =>
+// DbContext *pooling* + Npgsql
+builder.Services.AddDbContextPool<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add Identity services
-builder.Services.AddIdentity<IdentityUser, IdentityRole>()
+// ASP.NET Identity
+builder.Services
+    .AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
-// Register application services for DI
+// App services & repos
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
@@ -48,57 +43,62 @@ builder.Services.AddScoped<IActivitiesService, ActivitiesService>();
 builder.Services.AddScoped<IEventsService, EventsService>();
 builder.Services.AddScoped<IChallengesService, ChallengesService>();
 builder.Services.AddScoped<IRolesService, RolesService>();
-builder.Services.AddHttpClient<IClimatiqService, ClimatiqService>();
 
-
-// Register repositories for DI
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IActivityCompletionRepository, ActivityCompletionRepository>();
 builder.Services.AddScoped<IChallengeRepository, ChallengeRepository>();
 builder.Services.AddScoped<ISustainableActivityRepository, SustainableActivityRepository>();
 builder.Services.AddScoped<ISustainableEventRepository, SustainableEventRepository>();
 
-// Add CORS configuration
+// Outbound HTTP client(s) with sensible timeouts
+builder.Services.AddHttpClient<IClimatiqService, ClimatiqService>(c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(10);
+});
+
+// CORS — cache preflight to avoid OPTIONS on every call
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173", "https://greenwestminster-client.onrender.com")
-              .AllowAnyMethod()
+        policy.WithOrigins(
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "https://greenwestminster-client.onrender.com")
               .AllowAnyHeader()
-              .AllowCredentials();
+              .AllowAnyMethod()
+              .AllowCredentials()
+              .SetPreflightMaxAge(TimeSpan.FromHours(12));
     });
 });
 
-// Configure JWT authentication
+// JWT auth
+var requireHttps = !builder.Environment.IsDevelopment();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme             = JwtBearerDefaults.AuthenticationScheme;
 })
 .AddJwtBearer(options =>
 {
     options.SaveToken = true;
-    options.RequireHttpsMetadata = false; // Set to true in production
+    options.RequireHttpsMetadata = requireHttps;
     options.TokenValidationParameters = new TokenValidationParameters
-{
-    ValidateIssuer = false,
-    ValidateAudience = false,
-    ValidateLifetime = true,
-    ValidateIssuerSigningKey = true,
-    IssuerSigningKey = new SymmetricSecurityKey(
-        Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"] ??
-            throw new InvalidOperationException("JWT key is not configured"))),
-    
-    // ✅ Fix this line:
-    RoleClaimType = ClaimTypes.Role,
-    
-    NameClaimType = "unique_name"
-};
+    {
+        ValidateIssuer           = false,
+        ValidateAudience         = false,
+        ValidateLifetime         = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey         = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]
+                ?? throw new InvalidOperationException("JWT key is not configured"))),
 
+        // Make sure roles resolve correctly
+        RoleClaimType = ClaimTypes.Role
+    };
 
-    // Return 401 Unauthorized instead of redirecting to login page
+    // Return 401 JSON instead of redirect
     options.Events = new JwtBearerEvents
     {
         OnChallenge = context =>
@@ -106,8 +106,7 @@ builder.Services.AddAuthentication(options =>
             context.HandleResponse();
             context.Response.StatusCode = 401;
             context.Response.ContentType = "application/json";
-            var result = JsonSerializer.Serialize(new { message = "You are not authorized" });
-            return context.Response.WriteAsync(result);
+            return context.Response.WriteAsync("""{"message":"You are not authorized"}""");
         }
     };
 });
@@ -115,131 +114,92 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminPolicy", policy =>
-    {
-        // Use both the standard claim type and the custom one
-        policy.RequireAssertion(context => 
-            context.User.HasClaim(c => 
-                (c.Type == ClaimTypes.Role && c.Value == "Admin") || 
-                (c.Type == "role" && c.Value == "Admin")
-            )
-        );
-    });
+        policy.RequireAssertion(ctx =>
+            ctx.User.HasClaim(c => (c.Type == ClaimTypes.Role && c.Value == "Admin")
+                                || (c.Type == "role"        && c.Value == "Admin"))));
 });
+
+// Response compression (helps those post-login JSON calls)
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<GzipCompressionProvider>();
+    o.MimeTypes = ResponseCompressionDefaults.MimeTypes
+        .Concat(new[] { "application/json" });
+});
+
+// ---------- App ----------
 
 var app = builder.Build();
 
-// Initialize and seed the database before handling any requests
-await InitializeDatabase(app);
+// Server-Timing: see total backend time in the browser’s Network → Timing
+app.Use(async (ctx, next) =>
+{
+    var sw = Stopwatch.StartNew();
+    await next();
+    sw.Stop();
+    ctx.Response.Headers.Append("Server-Timing", $"app;dur={sw.ElapsedMilliseconds}");
+});
 
-// Configure the HTTP request pipeline
+// Swagger only in dev
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// Middleware pipeline (order matters!)
-app.UseCors("AllowReactApp");  // CORS should be before auth middleware
+app.UseResponseCompression();
+app.UseCors("AllowReactApp");
 
-// Only use HTTPS redirection in production to avoid development issues
-if (!app.Environment.IsDevelopment())
+if (requireHttps)
 {
     app.UseHttpsRedirection();
 }
-app.UseStaticFiles();
 
-app.UseAuthentication();  // Authentication always before Authorization
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
-// Fallback to index.html for client-side routing (React)
-app.MapFallbackToFile("index.html");
+// Health endpoints (good for uptime pings / cold-starts)
+app.MapGet("/healthz", () => Results.Ok(new { ok = true, time = DateTime.UtcNow }));
+app.MapGet("/healthz/db", async (AppDbContext db) =>
+    await db.Database.CanConnectAsync() ? Results.Ok(new { ok = true }) : Results.Problem("db unreachable"));
 
-// Weather forecast sample endpoint
-app.MapGet("/weatherforecast", () =>
+// Bind to Render’s provided PORT if present (more robust than forcing :80)
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(port))
 {
-    var summaries = new[]
-    {
-        "Freezing", "Bracing", "Chilly", "Cool", "Mild", 
-        "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-    };
-    
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
+    app.Urls.Add($"http://0.0.0.0:{port}");
+}
 
-// Set URL binding
-app.Urls.Add("http://*:80");
+// Apply migrations & warm the EF model/connection pool before serving traffic
+await InitializeDatabaseAsync(app);
 
 await app.RunAsync();
 
-// Database initialization method to keep the main flow clean
-async Task InitializeDatabase(WebApplication application)
+
+// ---------- Helpers ----------
+
+static async Task InitializeDatabaseAsync(WebApplication app)
 {
-    using var scope = application.Services.CreateScope();
-    var services = scope.ServiceProvider;
-    var logger = services.GetRequiredService<ILogger<Program>>();
-    
+    using var scope = app.Services.CreateScope();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var db     = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
     try
     {
-        logger.LogInformation("Initializing database...");
-        var context = services.GetRequiredService<AppDbContext>();
-        
-        // Create the schema if needed
-        await context.Database.EnsureCreatedAsync();
-        
-        // Check if data exists
-        bool hasData = false;
-        try
-        {
-            // Use parameterized query for better security
-            var result = await context.Database.ExecuteSqlRawAsync("SELECT COUNT(*) FROM users");
-            hasData = result > 0;
-        }
-        catch (Exception ex)
-        {
-            logger.LogInformation(ex, "Tables not found or empty, will proceed with data seeding");
-        }
-        
-        // Seed data if needed
-        if (!hasData)
-        {
-            logger.LogInformation("Seeding database with initial data...");
-            await DbSeeder.SeedData(context);
-            logger.LogInformation("Database seeded successfully");
-        }
-        else
-        {
-            logger.LogInformation("Database already contains data, skipping seed");
-        }
+        logger.LogInformation("Applying migrations…");
+        await db.Database.MigrateAsync();
+
+        // Warm up: build EF model & open a pooled connection
+        _ = await db.Users.AsNoTracking().AnyAsync();
+
+        logger.LogInformation("Database ready.");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "An error occurred while initializing the database");
-        
-        if (ex.InnerException != null)
-        {
-            logger.LogError(ex.InnerException, "Inner exception details");
-        }
-        
-        // Optionally terminate the application on critical DB errors
-        // application.Logger.LogCritical("Application cannot continue without database");
-        // Environment.Exit(1);
+        logger.LogError(ex, "Database initialization failed");
+        throw;
     }
-}
-
-// Weather forecast record definition
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }
