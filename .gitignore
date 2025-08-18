@@ -4,7 +4,6 @@
 .env.*.local
 .DS_Store
 node_modules/
-dist/
 build/
 
 # Ignore SQLite database if generated locally
