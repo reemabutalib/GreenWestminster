@@ -194,9 +194,9 @@ const HomePage = () => {
         </div>
       </section>
 
-      <footer className="footer">
+     <footer className="footer">
   <div className="footer-links">
-    <a href="/terms" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a>
+    <Link to="/terms">Terms &amp; Conditions</Link>
     <a href="mailto:sustainability@westminster.ac.uk">Contact Us</a>
   </div>
   <div>
