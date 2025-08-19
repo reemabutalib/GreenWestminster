@@ -10,7 +10,11 @@ const ReviewSubmissions = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:80';
+  const API_BASE_URL = (
+    import.meta.env.DEV
+      ? ''  // dev -> use Vite proxy
+      : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+  ).replace(/\/$/, '');
   const token = localStorage.getItem('token');
 
   const fetchSubmissions = async () => {
@@ -23,7 +27,7 @@ const ReviewSubmissions = () => {
     if (startDate) query.set('startDate', startDate);
     if (endDate)   query.set('endDate', endDate);
 
-    const url = `${API_URL}/api/admin/activity-completions?reviewStatus=Pending%20Review`;
+    const url = `${API_BASE_URL}/api/admin/activity-completions?reviewStatus=Pending%20Review`;
     const { data } = await axios.get(
       url,
       { headers: { Authorization: `Bearer ${token}` } }
@@ -49,7 +53,7 @@ const ReviewSubmissions = () => {
   setSubmitting(true);
   try {
     await axios.patch(
-      `${API_URL}/api/activities/review/${id}`,
+      `${API_BASE_URL}/api/activities/review/${id}`,
       { status, adminNotes },
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -97,7 +101,7 @@ const ReviewSubmissions = () => {
       submission.imageUrl && /^https?:\/\//i.test(submission.imageUrl.trim())
         ? submission.imageUrl.trim()
         : submission.imagePath
-        ? `${API_URL.replace(/\/$/, '')}/uploads/${String(submission.imagePath).trim()}`
+        ? `${API_BASE_URL.replace(/\/$/, '')}/uploads/${String(submission.imagePath).trim()}`
         : null;
 
     return (

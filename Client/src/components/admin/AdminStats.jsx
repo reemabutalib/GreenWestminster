@@ -10,11 +10,17 @@ const AdminStats = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const API_BASE_URL = (
+    import.meta.env.DEV
+      ? ''  // dev -> use Vite proxy
+      : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+  ).replace(/\/$/, '');
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:80/api/admin/user-stats', {
+        const response = await axios.get(`${API_BASE_URL}/api/admin/user-stats`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         console.log("[AdminStats] API response:", response.data);
@@ -96,32 +102,32 @@ const AdminStats = () => {
         )}
       </div>
 
-<div className="stats-section">
-  <h3>Points Distribution</h3>
-  {stats.pointsDistribution?.length > 0 && (
-    <div style={{ maxWidth: 320, margin: '0 auto' }}>
-      <Pie
-        data={{
-          labels: stats.pointsDistribution.map(d => d.pointRange),
-          datasets: [{
-            label: 'Users',
-            data: stats.pointsDistribution.map(d => d.userCount),
-            backgroundColor: [
-              'rgba(75, 192, 192, 0.6)',
-              'rgba(255, 206, 86, 0.6)',
-              'rgba(153, 102, 255, 0.6)'
-            ]
-          }]
-        }}
-        options={{
-          maintainAspectRatio: false
-        }}
-        height={220}
-        width={320}
-      />
-    </div>
-  )}
-</div>
+      <div className="stats-section">
+        <h3>Points Distribution</h3>
+        {stats.pointsDistribution?.length > 0 && (
+          <div style={{ maxWidth: 320, margin: '0 auto' }}>
+            <Pie
+              data={{
+                labels: stats.pointsDistribution.map(d => d.pointRange),
+                datasets: [{
+                  label: 'Users',
+                  data: stats.pointsDistribution.map(d => d.userCount),
+                  backgroundColor: [
+                    'rgba(75, 192, 192, 0.6)',
+                    'rgba(255, 206, 86, 0.6)',
+                    'rgba(153, 102, 255, 0.6)'
+                  ]
+                }]
+              }}
+              options={{
+                maintainAspectRatio: false
+              }}
+              height={220}
+              width={320}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="stats-section">
         <h3>Top Users</h3>

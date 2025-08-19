@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Text.Json.Serialization; // <-- added for JSON options
 
 using Server.Data;
 using Server.Repositories;
@@ -18,7 +19,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ---------------- Services ----------------
 
-builder.Services.AddControllers();
+// AddControllers + resilient JSON (STEP 2)
+builder.Services.AddControllers()
+    .AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        o.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        o.JsonSerializerOptions.MaxDepth = 32;
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -131,6 +140,33 @@ var app = builder.Build();
 
 // ---------------- Middleware order (important) ----------------
 
+// (STEP 1) Global exception guard – first in pipeline
+app.Use(async (ctx, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "UNHANDLED EXCEPTION");
+        if (!ctx.Response.HasStarted)
+        {
+            var isDev = app.Environment.IsDevelopment();
+            ctx.Response.StatusCode = 500;
+            ctx.Response.ContentType = "application/json";
+            var payload = new
+            {
+                success = false,
+                message = isDev ? ex.Message : "An unexpected error occurred.",
+                stack = isDev ? ex.ToString() : null
+            };
+            await ctx.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(payload));
+        }
+        // if headers already started, connection will be aborted by runtime
+    }
+});
+
 // Process X-Forwarded-* from Render BEFORE anything that uses scheme/host
 app.UseForwardedHeaders();
 
@@ -155,9 +191,7 @@ app.UseResponseCompression();
 app.UseRouting();
 app.UseCors("AllowReactApp");
 
-// IMPORTANT on Render: don't force HTTPS redirect unless ForwardedHeaders is in place.
-// If you prefer to keep it, it must be AFTER UseForwardedHeaders (we did that) and BEFORE UseRouting.
-// To avoid preflight redirects entirely, you can also comment the next line out.
+// HTTPS redirect only when not in Development
 if (requireHttps)
 {
     app.UseHttpsRedirection();
@@ -168,10 +202,25 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Health checks (handy for warmers)
+// Health checks (keep yours) …
 app.MapGet("/healthz", () => Results.Ok(new { ok = true, time = DateTime.UtcNow }));
 app.MapGet("/healthz/db", async (AppDbContext db) =>
     await db.Database.CanConnectAsync() ? Results.Ok(new { ok = true }) : Results.Problem("db unreachable"));
+
+// …and add /api/ versions (STEP 3)
+app.MapGet("/api/healthz", () => Results.Ok(new { ok = true, time = DateTime.UtcNow }));
+app.MapGet("/api/healthz/db", async (AppDbContext db) =>
+{
+    try
+    {
+        var can = await db.Database.CanConnectAsync();
+        return can ? Results.Ok(new { ok = true }) : Results.Problem("DB unreachable");
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(ex.ToString());
+    }
+});
 
 // Bind to Render's PORT
 var port = Environment.GetEnvironmentVariable("PORT");

@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import '../styling/ActiveChallenges.css';
 
 // API base URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80';
+const API_BASE_URL = (
+  import.meta.env.DEV
+    ? '' 
+    : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+).replace(/\/$/, '');
 
 const ActiveChallenges = ({ userId }) => {
   const [challenges, setChallenges] = useState([]);

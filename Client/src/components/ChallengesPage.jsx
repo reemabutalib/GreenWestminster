@@ -11,7 +11,11 @@ const ChallengesPage = () => {
 
   const userId = Number(localStorage.getItem('userId')) || 1; // replace with auth context when ready
   const token = localStorage.getItem('token');
-  const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:80').replace(/\/$/, '');
+  const API_BASE_URL = (
+  import.meta.env.DEV
+    ? '' 
+    : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+).replace(/\/$/, '');
 
   const fetchChallenges = async () => {
     setLoading(true);

@@ -59,9 +59,11 @@ const avatarStyles = [
   { name: 'Gaia\'s Guardian', img: '/avatars/platinum-gaias-guardian.png' },
 ];
 
-
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:80').replace(/\/$/, '');
-
+const API_BASE_URL = (
+  import.meta.env.DEV
+    ? '' 
+    : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+).replace(/\/$/, '');
 // helpers to persist dismissed approvals
 const getIdSet = (key) => {
   try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')); }

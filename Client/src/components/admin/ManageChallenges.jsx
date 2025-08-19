@@ -14,11 +14,17 @@ const ManageChallenges = () => {
     pointsReward: 0
   });
 
+  const API_BASE_URL = (
+    import.meta.env.DEV
+      ? ''  // dev -> use Vite proxy
+      : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+  ).replace(/\/$/, '');
+
   const fetchData = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:80/api/challenges', {
+      const response = await axios.get(`${API_BASE_URL}/api/challenges`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setChallenges(response.data);
@@ -47,7 +53,7 @@ const ManageChallenges = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:80/api/challenges', formData, {
+      await axios.post(`${API_BASE_URL}/api/challenges`, formData, {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
@@ -85,7 +91,7 @@ const ManageChallenges = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`http://localhost:80/api/challenges/${editingChallenge}`, formData, {
+      await axios.put(`${API_BASE_URL}/api/challenges/${editingChallenge}`, formData, {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
@@ -112,7 +118,7 @@ const ManageChallenges = () => {
     }
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:80/api/challenges/${id}`, {
+      await axios.delete(`${API_BASE_URL}/api/challenges/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchData();

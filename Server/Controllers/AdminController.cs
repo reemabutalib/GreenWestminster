@@ -69,7 +69,7 @@ namespace Server.Controllers
 
                 var baseUrl = (Request?.Scheme != null && Request?.Host.HasValue == true)
                     ? $"{Request.Scheme}://{Request.Host}"
-                    : "http://localhost:80";
+                    : "http://localhost:5138";
 
                 var query = _context.ActivityCompletions
                     .Include(ac => ac.User)

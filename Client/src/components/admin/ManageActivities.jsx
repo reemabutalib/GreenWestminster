@@ -16,11 +16,17 @@ const ManageActivities = () => {
     isOneTime: false
   });
 
+  const API_BASE_URL = (
+    import.meta.env.DEV
+      ? ''  // dev -> use Vite proxy
+      : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+  ).replace(/\/$/, '');
+
   const fetchActivities = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:80/api/activities', {
+      const response = await axios.get(`${API_BASE_URL}/api/activities`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setActivities(response.data);
@@ -49,7 +55,7 @@ const ManageActivities = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:80/api/activities', formData, {
+      await axios.post(`${API_BASE_URL}/api/activities`, formData, {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
@@ -91,7 +97,7 @@ const ManageActivities = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      await axios.put('http://localhost:80/api/activities', formData, {
+      await axios.put(`${API_BASE_URL}/api/activities`, formData, {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
@@ -117,24 +123,23 @@ const ManageActivities = () => {
   };
 
   const handleDeleteActivity = async (id) => {
-  if (!window.confirm('Are you sure you want to delete this activity?')) return;
+    if (!window.confirm('Are you sure you want to delete this activity?')) return;
 
-  try {
-    const token = localStorage.getItem('token');
-    await axios.delete('http://localhost:80/api/activities', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      data: { id } // <<< IMPORTANT: body for DELETE
-    });
-    fetchActivities();
-  } catch (err) {
-    setError('Failed to delete activity');
-    console.error(err);
-  }
-};
-
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_BASE_URL}/api/activities`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        data: { id } // <<< IMPORTANT: body for DELETE
+      });
+      fetchActivities();
+    } catch (err) {
+      setError('Failed to delete activity');
+      console.error(err);
+    }
+  };
 
   const handleCancelEdit = () => {
     setEditingActivity(null);

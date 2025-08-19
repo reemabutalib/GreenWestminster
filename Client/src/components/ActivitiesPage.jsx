@@ -22,7 +22,11 @@ const ActivitiesPage = () => {
 
   const [pendingActivities, setPendingActivities] = useState([]);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80';
+  const API_BASE_URL = (
+  import.meta.env.DEV
+    ? '' 
+    : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+).replace(/\/$/, '');
   const userId = localStorage.getItem('userId') || 1;
 
   useEffect(() => {

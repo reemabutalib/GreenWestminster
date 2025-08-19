@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:80').replace(/\/$/, '');
+const API_BASE_URL = (
+    import.meta.env.DEV
+      ? ''  // dev -> use Vite proxy
+      : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+  ).replace(/\/$/, '');
 
 const ManageEvents = () => {
   const [events, setEvents] = useState([]);

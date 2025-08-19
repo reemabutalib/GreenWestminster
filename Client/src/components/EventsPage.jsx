@@ -9,13 +9,19 @@ const EventsPage = () => {
   const [filter, setFilter] = useState('upcoming');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [categories, setCategories] = useState([]);
+
+  const API_BASE_URL = (
+    import.meta.env.DEV
+      ? ''  // dev -> use Vite proxy
+      : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+  ).replace(/\/$/, '');
   
   useEffect(() => {
     const fetchEvents = async () => {
       try {
         setLoading(true);
-        const endpoint = filter === 'upcoming' ? 'api/events/upcoming' : 'api/events';
-        const response = await axios.get(`http://localhost:80/${endpoint}`);
+        const endpoint = filter === 'upcoming' ? '/api/events/upcoming' : '/api/events';
+        const response = await axios.get(`${API_BASE_URL}${endpoint}`);
         
         let filteredEvents = response.data;
         

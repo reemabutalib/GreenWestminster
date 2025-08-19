@@ -942,7 +942,7 @@ public async Task<ActionResult<IEnumerable<object>>> GetPendingActivities(int us
     {
         var baseUrl = (Request?.Scheme != null && Request?.Host.HasValue == true)
             ? $"{Request.Scheme}://{Request.Host}"
-            : "http://localhost:80";
+            : "http://localhost:5138";
 
         var items = await (
             from ac in _context.ActivityCompletions.AsNoTracking()

@@ -1,7 +1,11 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80';
+const API_BASE_URL = (
+  import.meta.env.DEV
+    ? 'http://localhost:5138' // <-- hit Kestrel directly in dev for now
+    : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+).replace(/\/$/, '');
 
 export const useAuth = () => useContext(AuthContext);
 

@@ -14,7 +14,11 @@ const StreakCounter = ({ userId }) => {
   const [resetNotice, setResetNotice] = useState(false);
   const [increaseNotice, setIncreaseNotice] = useState(false);
 
-  const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:80').replace(/\/$/, '');
+  const API_BASE_URL = (
+  import.meta.env.DEV
+    ? '' 
+    : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+).replace(/\/$/, '');
 
   const todayKey = useMemo(() => {
     const d = new Date();

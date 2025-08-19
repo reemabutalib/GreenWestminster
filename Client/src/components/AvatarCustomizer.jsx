@@ -3,7 +3,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './context/UserContext';
 import '../styling/AvatarCustomizer.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80';
+const API_BASE_URL = (
+  import.meta.env.DEV
+    ? '' 
+    : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+).replace(/\/$/, '');
 
 // Level thresholds you already use in the app
 const LEVEL_THRESHOLDS = {

@@ -23,10 +23,13 @@ const Navigation = () => {
     }
   }, [location]);
 
+  // Smart "Home" target for the logo
+  const homeTo = isLoggedIn ? (isAdmin ? '/admin/dashboard' : '/dashboard') : '/';
+
   return (
     <nav className="nav-container">
       <div className="nav-logo">
-        <Link to="/">
+        <Link to={homeTo}>
           <img
             src="/images/GW-logo.png"
             alt="Green Westminster Logo"
@@ -70,7 +73,10 @@ const Navigation = () => {
             </Link>
           </>
         ) : isAdmin ? (
-          <Link to="/admin/dashboard" className={location.pathname.startsWith('/admin') ? 'active nav-link' : 'nav-link'}>
+          <Link
+            to="/admin/dashboard"
+            className={location.pathname.startsWith('/admin') ? 'active nav-link' : 'nav-link'}
+          >
             Admin Dashboard
           </Link>
         ) : (
@@ -97,9 +103,7 @@ const Navigation = () => {
       <div className="nav-auth">
         {isLoggedIn ? (
           <>
-            {isAdmin && (
-              <span className="admin-badge">Admin</span>
-            )}
+            {isAdmin && <span className="admin-badge">Admin</span>}
             <Logout />
           </>
         ) : null}
