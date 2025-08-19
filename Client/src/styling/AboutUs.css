@@ -1,0 +1,108 @@
+:root{
+  --green-600:#2b7a4b;
+  --green-500:#4CAF50;
+  --green-400:#6ac47e;
+  --soft:#f6fbf7;
+  --ink:#111827;
+}
+
+.about { padding: 2.5rem 0 3.5rem; background:#fafaf9; }
+
+.container{
+  max-width: 1040px;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+/* ---------- Hero ---------- */
+.about-hero{
+  text-align:center;
+  margin-bottom: 1.25rem;
+}
+.about-kicker{
+  display:inline-block;
+  font-weight:700;
+  color:#1e5337;
+  background:#e7f6ec;
+  border:1px solid #d6ecd9;
+  padding:.35rem .75rem;
+  border-radius:999px;
+  letter-spacing:.2px;
+  margin-bottom:.6rem;
+}
+.about-title{
+  font-size: clamp(2rem, 4.2vw, 3rem);
+  color:#101c14;
+  margin: 0.25rem 0 0.75rem;
+  font-weight:800;
+}
+.about-bar{
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e9f6ee, #dff3e4);
+  margin: 0.5rem auto 0;
+  width: min(560px, 70%);
+  box-shadow: inset 0 0 0 1px #d6ecd9;
+}
+
+/* ---------- Media card ---------- */
+.about-media{ margin-top: 1.25rem; margin-bottom: 2rem; }
+.about-figure{
+  position: relative;
+  border-radius: 20px;
+  overflow:hidden;
+  background:#eef6f0;
+  box-shadow: 0 10px 30px rgba(44,132,85,.10);
+}
+.about-img{
+  width:100%; height: 340px; object-fit: cover; display:block;
+}
+.about-figcap{
+  position:absolute;
+  left: 12px; bottom: 12px;
+  display:flex; gap:.5rem; flex-wrap: wrap;
+}
+.about-chip{
+  background:#ffffff;
+  border:1px solid #e3efe7;
+  color:#184b32;
+  font-weight:700;
+  border-radius:999px;
+  padding:.35rem .6rem;
+  box-shadow: 0 2px 8px rgba(44,132,85,.08);
+  font-size:.9rem;
+}
+
+/* ---------- Body copy ---------- */
+.about-body{ margin-top: 0.75rem; }
+.about-card{
+  background: #f6fff6;
+  border: 1px solid #e3efe7;
+  border-radius: 20px;
+  padding: clamp(1.25rem, 2.5vw, 2rem);
+  box-shadow: 0 8px 24px rgba(44,132,85,.07);
+  color:#193b2a;
+  line-height:1.65;
+  font-size: clamp(1rem, 1.2vw, 1.08rem);
+}
+.about-card strong{ color:#0f5b39; }
+.about-link{
+  display:inline-block;
+  margin-top:.35rem;
+  font-weight:700;
+  color:#1e5f3f;
+  text-decoration:none;
+  background:#e9f6ee;
+  border:1px solid #d6ecd9;
+  padding:.45rem .8rem;
+  border-radius:999px;
+  transition: background .2s ease, color .2s ease, transform .06s;
+}
+.about-link:hover{ background:#dff3e4; color:#093e27; }
+.about-link:active{ transform: translateY(1px); }
+
+/* ---------- Small screens ---------- */
+@media (max-width: 640px){
+  .about-img{ height: 240px; }
+  .about-figcap{ left: 10px; right: 10px; }
+}

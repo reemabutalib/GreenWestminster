@@ -280,7 +280,7 @@ const Register = () => {
                 />
                 Email
               </label>
-              <label style={{ marginLeft: '1rem' }}>
+              <label>
                 <input
                   type="radio"
                   name="preferredContact"

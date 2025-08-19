@@ -1,20 +1,21 @@
 import React from 'react';
-import { Link, Outlet } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import '../../styling/AdminDashboard.css';
 
 const AdminDashboard = () => {
   return (
-    <div className="admin-dashboard">
-      <nav className="admin-navigation">
-        <Link to="/admin/dashboard" className="admin-nav-link">Overview</Link>
-        <Link to="/admin/dashboard/activities" className="admin-nav-link">Manage Activities</Link>
-        <Link to="/admin/dashboard/events" className="admin-nav-link">Manage Events</Link>
-        <Link to="/admin/dashboard/challenges" className="admin-nav-link">Manage Challenges</Link>
-        <Link to="/admin/dashboard/review" className="admin-nav-link">Review Submissions</Link>
+    <div className="admin-shell">
+      <nav className="admin-nav" role="navigation" aria-label="Admin">
+        <NavLink to="/admin/dashboard" className={({isActive}) => `admin-tab ${isActive ? 'active' : ''}`}>Overview</NavLink>
+        <NavLink to="/admin/dashboard/activities" className={({isActive}) => `admin-tab ${isActive ? 'active' : ''}`}>Manage Activities</NavLink>
+        <NavLink to="/admin/dashboard/events" className={({isActive}) => `admin-tab ${isActive ? 'active' : ''}`}>Manage Events</NavLink>
+        <NavLink to="/admin/dashboard/challenges" className={({isActive}) => `admin-tab ${isActive ? 'active' : ''}`}>Manage Challenges</NavLink>
+        <NavLink to="/admin/dashboard/review" className={({isActive}) => `admin-tab ${isActive ? 'active' : ''}`}>Review Submissions</NavLink>
       </nav>
-      <div className="admin-content">
+
+      <main className="admin-content">
         <Outlet />
-      </div>
+      </main>
     </div>
   );
 };

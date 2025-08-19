@@ -38,32 +38,26 @@ const tipsByCategory = {
 };
 
 const avatarStyles = [
-  // Bronze
   { name: 'Sprout Seeker', img: '/avatars/bronze-sprout-seeker.png' },
   { name: 'Seedling Adventurer', img: '/avatars/bronze-seedling-adventurer.png' },
   { name: 'Eco Explorer', img: '/avatars/bronze-eco-explorer.png' },
-
-  // Silver
   { name: 'Leaf Guardian', img: '/avatars/silver-leaf-guardian.png' },
   { name: 'Eco Pathfinder', img: '/avatars/silver-eco-pathfinder.png' },
   { name: 'River Protector', img: '/avatars/silver-river-protector.png' },
-
-  // Gold
   { name: 'Sunlight Steward', img: '/avatars/gold-sunlight-steward.png' },
   { name: 'Forest Champion', img: '/avatars/gold-forest-champion.png' },
   { name: 'Wildlife Guardian', img: '/avatars/gold-wildlife-guardian.png' },
-
-  // Platinum
   { name: 'Planet Protector', img: '/avatars/platinum-planet-protector.png' },
   { name: 'Harmony Keeper', img: '/avatars/platinum-harmony-keeper.png' },
-  { name: 'Gaia\'s Guardian', img: '/avatars/platinum-gaias-guardian.png' },
+  { name: "Gaia's Guardian", img: '/avatars/platinum-gaias-guardian.png' },
 ];
 
 const API_BASE_URL = (
   import.meta.env.DEV
-    ? '' 
+    ? ''
     : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
 ).replace(/\/$/, '');
+
 // helpers to persist dismissed approvals
 const getIdSet = (key) => {
   try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')); }
@@ -71,7 +65,6 @@ const getIdSet = (key) => {
 };
 const setIdSet = (key, set) => localStorage.setItem(key, JSON.stringify(Array.from(set)));
 
-// neat datetime like "13 Aug 2025, 09:12"
 const formatDateTime = (d) =>
   new Date(d).toLocaleString(undefined, {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -81,7 +74,7 @@ const formatDateTime = (d) =>
 const Dashboard = () => {
   const { currentUser } = useAuth();
 
-  // toast state INSIDE component
+  // toast
   const [toast, setToast] = useState(null);
   const showToast = (msg) => {
     setToast(msg);
@@ -89,7 +82,7 @@ const Dashboard = () => {
     showToast._t = window.setTimeout(() => setToast(null), 3000);
   };
 
-  // core user/state
+  // core state
   const [userData, setUserData] = useState(null);
   const [levelInfo, setLevelInfo] = useState({
     currentLevel: "Bronze",
@@ -108,33 +101,92 @@ const Dashboard = () => {
   const [pointsHistory, setPointsHistory] = useState([]);
   const [carbonImpact, setCarbonImpact] = useState({ co2Reduced: 0, treesEquivalent: 0, waterSaved: 0 });
 
-  // tips
   const [lowTipCategories, setLowTipCategories] = useState([]);
-
-  // completions + reviews
-  const [pendingItems, setPendingItems] = useState([]);     // Pending Review + Rejected
-  const [allCompletions, setAllCompletions] = useState([]); // includes Approved (for notifications)
-
-  // challenges (joined by user)
+  const [pendingItems, setPendingItems] = useState([]);
+  const [allCompletions, setAllCompletions] = useState([]);
   const [userChallenges, setUserChallenges] = useState([]);
 
-  // resubmit modal
   const [resubmitOpen, setResubmitOpen] = useState(false);
   const [resubmitTarget, setResubmitTarget] = useState(null);
   const [resubmitNotes, setResubmitNotes] = useState('');
   const [resubmitFile, setResubmitFile] = useState(null);
   const [resubmitting, setResubmitting] = useState(false);
 
-  // approved notifications (dismissible)
   const [dismissedApproved, setDismissedApproved] = useState(() => getIdSet('approvedDismissedIds'));
 
-  // loading/error
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const token = useMemo(() => (currentUser?.token || localStorage.getItem('token') || ''), [currentUser]);
 
-  // fetch everything
+// Reveal-on-scroll (fail-safe + handles late-mounted nodes)
+useEffect(() => {
+  const body = document.body;
+  body.classList.add('enable-reveal');
+
+  const prefersReduced =
+    window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+
+  // Helper: reveal immediately (fallback / reduced motion)
+  const revealAllNow = () => {
+    document.querySelectorAll('[data-reveal]').forEach((n) => {
+      n.classList.add('is-revealed');
+    });
+  };
+
+  if (prefersReduced || typeof IntersectionObserver === 'undefined') {
+    revealAllNow();
+    return () => body.classList.remove('enable-reveal');
+  }
+
+  // IO that reveals elements as they enter viewport
+  const io = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          e.target.classList.add('is-revealed');
+          io.unobserve(e.target);
+        }
+      });
+    },
+    { threshold: 0.12, rootMargin: '0px 0px -10% 0px' }
+  );
+
+  // Observe any element we find (and don't re-observe already revealed)
+  const observe = (el) => {
+    if (!el || !(el instanceof Element)) return;
+    if (el.classList.contains('is-revealed')) return;
+    io.observe(el);
+  };
+
+  // Observe what exists now…
+  document.querySelectorAll('[data-reveal]').forEach(observe);
+
+  // …and also anything that appears later (after data finishes loading)
+  const mo = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      m.addedNodes.forEach((node) => {
+        if (!(node instanceof Element)) return;
+        if (node.hasAttribute('data-reveal')) observe(node);
+        node.querySelectorAll?.('[data-reveal]').forEach(observe);
+      });
+    }
+  });
+  mo.observe(document.body, { childList: true, subtree: true });
+
+  // Cleanup
+  return () => {
+    mo.disconnect();
+    io.disconnect();
+    body.classList.remove('enable-reveal');
+  };
+}, []);
+
+
+
+  /* =======================
+     Data fetching
+     ======================= */
   useEffect(() => {
     if (!currentUser) { setLoading(false); return; }
     const userId = currentUser.userId;
@@ -144,7 +196,7 @@ const Dashboard = () => {
       try {
         const authHeader = { Authorization: `Bearer ${token}` };
 
-        // user profile
+        // user
         const userRes = await fetch(`${API_BASE_URL}/api/users/${userId}`, { headers: authHeader });
         if (!userRes.ok) throw new Error('Failed to fetch user data');
         const user = await userRes.json();
@@ -154,7 +206,7 @@ const Dashboard = () => {
         const levelRes = await fetch(`${API_BASE_URL}/api/users/${userId}/level-info`, { headers: authHeader });
         if (levelRes.ok) setLevelInfo(await levelRes.json());
 
-        // carbon impact (Approved only)
+        // impact (Approved)
         const impactRes = await fetch(`${API_BASE_URL}/api/activities/users/${userId}/carbon-impact`, { headers: authHeader });
         if (impactRes.ok) {
           const impactData = await impactRes.json();
@@ -165,11 +217,11 @@ const Dashboard = () => {
           });
         }
 
-        // pending + rejected
+        // pending/rejected
         const pendingRes = await fetch(`${API_BASE_URL}/api/activities/pending/${userId}`, { headers: authHeader });
         if (pendingRes.ok) setPendingItems(await pendingRes.json());
 
-        // all completions (for approvals notifications)
+        // all completions
         const allRes = await fetch(`${API_BASE_URL}/api/activities/completed/${userId}`, { headers: authHeader });
         if (allRes.ok) setAllCompletions(await allRes.json());
 
@@ -201,7 +253,7 @@ const Dashboard = () => {
         const pointsRes = await fetch(`${API_BASE_URL}/api/users/${userId}/points-history`, { headers: authHeader });
         if (pointsRes.ok) setPointsHistory(await pointsRes.json());
 
-        // user challenges (joined)
+        // user challenges
         const myChallengesRes = await fetch(`${API_BASE_URL}/api/challenges/user/${userId}`, { headers: authHeader });
         if (myChallengesRes.ok) {
           const list = await myChallengesRes.json();
@@ -217,7 +269,6 @@ const Dashboard = () => {
     };
 
     fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, token]);
 
   // Recently Approved (not dismissed)
@@ -240,13 +291,11 @@ const Dashboard = () => {
     setDismissedApproved(next);
     setIdSet('approvedDismissedIds', next);
 
-    // tell the user how many points they actually got
     const pts = Number(item.pointsEarned || 0);
     const title = item.activity?.title || 'your activity';
     showToast(pts > 0 ? `+${pts} points for “${title}” 🎉` : `Marked as read: “${title}”`);
   };
 
-  // In-progress, de-duped challenges
   const inProgressChallenges = useMemo(() => {
     const now = new Date();
     const byId = new Map();
@@ -258,7 +307,6 @@ const Dashboard = () => {
     return [...byId.values()];
   }, [userChallenges]);
 
-  // resubmit handler
   const submitResubmission = async () => {
     if (!resubmitTarget) return;
     setResubmitting(true);
@@ -280,7 +328,6 @@ const Dashboard = () => {
       }
       const data = await resp.json();
 
-      // set back to Pending Review
       setPendingItems(prev =>
         prev.map(item =>
           item.id === resubmitTarget.id
@@ -312,15 +359,12 @@ const Dashboard = () => {
   if (error) return <div className="error-container"><div className="error">Error: {error}</div></div>;
   if (!userData) return <div className="no-user-container"><div className="no-user">No user data available</div></div>;
 
-  // avatar selection
   const selectedAvatar = avatarStyles.find((style) => style.name === userData.avatarStyle);
-
-  // chart colors
   const COLORS = ['#4CAF50', '#8BC34A', '#CDDC39', '#FFC107', '#FF9800', '#009688'];
 
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
+      <header className="dashboard-header" data-reveal="up" data-reveal-delay="0">
         <h2>Welcome back, {userData.username}!</h2>
         <p className="dashboard-guidance">
           Need help? Hover over icons and stats for tips. Complete activities and challenges to earn more points!
@@ -361,7 +405,7 @@ const Dashboard = () => {
       </header>
 
       {approvedNotifications.length > 0 && (
-        <section className="approved-section">
+        <section className="approved-section" data-reveal="up" data-reveal-delay="80">
           <div className="section-header"><h3>Recently Approved</h3></div>
           <ul className="approved-list">
             {approvedNotifications.map(item => (
@@ -386,7 +430,7 @@ const Dashboard = () => {
       )}
 
       {/* Level Progress */}
-      <section className="level-section">
+      <section className="level-section" data-reveal="up" data-reveal-delay="120">
         <div className="section-header"><h3>Your Level</h3></div>
         <div className="level-card">
           <div className="level-badge">
@@ -410,7 +454,7 @@ const Dashboard = () => {
       </section>
 
       {/* Carbon Impact */}
-      <section className="carbon-impact-section">
+      <section className="carbon-impact-section" data-reveal="up" data-reveal-delay="160">
         <div className="section-header"><h3>Carbon Impact Estimate</h3></div>
         <div className="carbon-impact-container">
           <div className="impact-card"><div className="impact-icon">🌍</div><div className="impact-value">{carbonImpact.co2Reduced} kg</div><div className="impact-label">CO₂ Reduced</div></div>
@@ -420,7 +464,7 @@ const Dashboard = () => {
       </section>
 
       {/* Pending / Rejected */}
-      <section className="pending-activities-section">
+      <section className="pending-activities-section" data-reveal="up" data-reveal-delay="200">
         <div className="section-header">
           <h3>Pending & Rejected</h3>
           <Link to="/activities" className="cta-btn">Go to Activities</Link>
@@ -464,7 +508,7 @@ const Dashboard = () => {
       </section>
 
       {/* Your Challenges (only in-progress) */}
-      <section className="user-challenges-section">
+      <section className="user-challenges-section" data-reveal="up" data-reveal-delay="240">
         <div className="section-header">
           <h3>Your Challenges</h3>
           <Link to="/challenges" className="cta-btn">Go to Challenges</Link>
@@ -493,7 +537,7 @@ const Dashboard = () => {
 
       {/* Tips */}
       {lowTipCategories.length > 0 && (
-        <section className="tips-section">
+        <section className="tips-section" data-reveal="up" data-reveal-delay="280">
           <div className="section-header"><h3>Personalised Sustainability Tips</h3></div>
           <div className="tips-container">
             {lowTipCategories.map((category, idx) => (
@@ -509,55 +553,56 @@ const Dashboard = () => {
       )}
 
       {/* Progress Charts */}
-      <section className="progress-section">
+      <section className="progress-section" data-reveal="up" data-reveal-delay="320">
         <div className="section-header"><h3>Your Progress</h3></div>
         <div className="charts-container">
           <div className="chart-row">
             <div className="chart-card">
-  <h4>Activities by Category</h4>
+              <h4>Activities by Category</h4>
+              <div className="chart-split">
+                <div className="chart-plot">
+                  <ResponsiveContainer width="100%" height={260}>
+                    <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                      <Pie
+                        data={activityStats.categoryCounts}
+                        cx="50%" cy="50%"
+                        innerRadius={45} outerRadius={95}
+                        labelLine={false}
+                        dataKey="value" nameKey="name"
+                        isAnimationActive={true}
+                        animationDuration={700}
+                        animationBegin={120}
+                        label={({ percent }) => (percent > 0.08 ? `${(percent * 100).toFixed(0)}%` : '')}
+                      >
+                        {activityStats.categoryCounts.map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v, n) => [`${v} activities`, n]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
 
-  <div className="chart-split">
-    <div className="chart-plot">
-      <ResponsiveContainer width="100%" height={260}>
-        <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
-          <Pie
-            data={activityStats.categoryCounts}
-            cx="50%" cy="50%"
-            innerRadius={45} outerRadius={95}
-            labelLine={false}
-            dataKey="value" nameKey="name"
-            label={({ percent }) => (percent > 0.08 ? `${(percent * 100).toFixed(0)}%` : '')}
-          >
-            {activityStats.categoryCounts.map((_, i) => (
-              <Cell key={i} fill={COLORS[i % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(v, n) => [`${v} activities`, n]} />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-
-    <ul className="chart-legend">
-      {activityStats.categoryCounts.map((d, i) => (
-        <li key={d.name}>
-          <span className="swatch" style={{ background: COLORS[i % COLORS.length] }} />
-          {d.name}
-        </li>
-      ))}
-    </ul>
-  </div>
-</div>
-
+                <ul className="chart-legend">
+                  {activityStats.categoryCounts.map((d, i) => (
+                    <li key={d.name}>
+                      <span className="swatch" style={{ background: COLORS[i % COLORS.length] }} />
+                      {d.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
 
             <div className="chart-card">
               <h4>Weekly Activity</h4>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={activityStats.weeklyActivity} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
                   <XAxis dataKey="day" />
                   <YAxis />
                   <Tooltip formatter={(value) => [`${value} activities`]} />
-                  <Bar dataKey="count" fill="#4CAF50" />
+                  <Bar dataKey="count" fill="#4CAF50" isAnimationActive animationDuration={700} animationBegin={180} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -572,7 +617,7 @@ const Dashboard = () => {
                 <YAxis />
                 <Tooltip formatter={(value) => [`${value} points`]} />
                 <Legend />
-                <Line type="monotone" dataKey="points" stroke="#2E7D32" strokeWidth={2} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="points" stroke="#2E7D32" strokeWidth={2} dot={{ r: 4 }} isAnimationActive animationDuration={750} animationBegin={220} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -620,7 +665,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Toast UI (add styles from my previous message) */}
+      {/* Toast */}
       {toast && (
         <div className="toast toast-success">
           {toast}

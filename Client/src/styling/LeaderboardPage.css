@@ -1,4 +1,6 @@
-/* Page container */
+/* =========================
+   Page container & headings
+   ========================= */
 .leaderboard-page {
   max-width: 1100px;
   margin: 0 auto;
@@ -6,7 +8,6 @@
   font-family: 'Inter', system-ui, sans-serif;
 }
 
-/* Title and subtitle */
 .leaderboard-page h2 {
   margin-bottom: 0.5rem;
   color: #2e7d32;
@@ -21,7 +22,9 @@
   font-size: 1.08rem;
 }
 
-/* Filter buttons */
+/* =========================
+   Filters
+   ========================= */
 .leaderboard-filters {
   display: flex;
   gap: 1rem;
@@ -40,13 +43,11 @@
   font-weight: 500;
   transition: all 0.2s;
 }
-
 .filter-btn:hover {
   background: #e8f5e9;
   color: #145214;
   border-color: #81c784;
 }
-
 .filter-btn.active {
   background: #c8e6c9;
   color: #2e7d32;
@@ -55,7 +56,9 @@
   box-shadow: 0 2px 8px rgba(76, 175, 80, 0.10);
 }
 
-/* Your rank banner */
+/* =========================
+   Your rank banner
+   ========================= */
 .your-rank {
   display: flex;
   align-items: center;
@@ -68,79 +71,79 @@
   box-shadow: 0 2px 8px rgba(76, 175, 80, 0.07);
   font-size: 1.15rem;
 }
+.your-tier { font-weight: 800; color: #2e7d32; font-size: 1.15rem; margin-right: 0.5rem; }
+.rank-label { color: #2e7d32; font-weight: 600; margin-right: 0.5rem; }
+.rank-value { font-size: 2.2rem; font-weight: 800; color: #2e7d32; margin-right: 0.5rem; }
+.rank-suffix { color: #616161; font-size: 1rem; }
 
-.your-tier {
-  font-weight: 800;
-  color: #2e7d32;
-  font-size: 1.15rem;
-  margin-right: 0.5rem;
-}
+/* Tier accent variants */
+.your-rank--bronze   { border-left: 6px solid #8d6e63; background: #f8f4f1; }
+.your-rank--silver   { border-left: 6px solid #90a4ae; background: #f5f7f9; }
+.your-rank--gold     { border-left: 6px solid #c9a227; background: #fff9e6; }
+.your-rank--platinum { border-left: 6px solid #90caf9; background: #f0f8ff; }
 
-.rank-label {
-  color: #2e7d32;
-  font-weight: 600;
-  margin-right: 0.5rem;
-}
-
-.rank-value {
-  font-size: 2.2rem;
-  font-weight: 800;
-  color: #2e7d32;
-  margin-right: 0.5rem;
-}
-
-.rank-suffix {
-  color: #616161;
-  font-size: 1rem;
-}
-
-/* Tier-specific accent for the banner */
-.your-rank--bronze   { border-left: 8px solid #8d6e63; background: #f8f4f1; }
-.your-rank--silver   { border-left: 8px solid #90a4ae; background: #f5f7f9; }
-.your-rank--gold     { border-left: 8px solid #c9a227; background: #fff9e6; }
-.your-rank--platinum { border-left: 8px solid #90caf9; background: #f0f8ff; }
-
-/* Leaderboard grid */
+/* =========================
+   Grid: keep two columns
+   ========================= */
 .leaderboard-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2rem;
   margin-bottom: 2rem;
 }
-
 @media (max-width: 900px) {
-  .leaderboard-grid {
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
-  }
+  .leaderboard-grid { grid-template-columns: 1fr; gap: 1.25rem; }
 }
 
-/* Level card */
+/* =========================
+   Level card + top header bar
+   ========================= */
 .level-card {
+  --tier: #e0e0e0; /* default safety */
   background: #fff;
   border-radius: 14px;
   border: 1.5px solid #eee;
-  overflow: hidden;
   box-shadow: 0 2px 10px rgba(0,0,0,.04);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.level-card__header {
+/* set the tier color via class */
+.level-bronze   { --tier: #8d6e63; }
+.level-silver   { --tier: #90a4ae; }
+.level-gold     { --tier: #c9a227; }
+.level-platinum { --tier: #90caf9; }
+
+/* Top header sits ABOVE the table (not at the left) */
+.level-card__header{
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.1rem 1.5rem;
-  border-bottom: 1.5px solid #f0f0f0;
-  background: #fafafa;
+  gap: 1rem;
+  background: #fff;
+  padding: 0.9rem 1.2rem 1.1rem;
+  border-bottom: 1px solid #f0f0f0;
 }
 
+/* thin coloured stripe at the very top */
+.level-card__header::before{
+  content: "";
+  position: absolute;
+  left: 0; top: 0;
+  width: 100%; height: 8px;
+  background: var(--tier);
+}
+
+/* header content */
 .level-heading {
   margin: 0;
   font-size: 1.2rem;
   font-weight: 800;
   color: #2e7d32;
 }
-
 .level-chip {
   font-size: 0.95rem;
   color: #616161;
@@ -149,30 +152,23 @@
   border-radius: 999px;
   padding: 0.3rem 0.8rem;
   font-weight: 500;
-  white-space: nowrap;      /* Prevents text from wrapping */
-  display: flex;            /* Centers text vertically */
+  white-space: nowrap;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 80px;          /* Optional: ensures enough space */
-  height: 32px;             /* Optional: consistent height */
+  min-width: 80px;
+  height: 32px;
 }
 
-/* Tier accent border */
-.level-bronze   .level-card__header { border-left: 8px solid #8d6e63; }
-.level-silver   .level-card__header { border-left: 8px solid #90a4ae; }
-.level-gold     .level-card__header { border-left: 8px solid #c9a227; }
-.level-platinum .level-card__header { border-left: 8px solid #90caf9; }
-
-/* Table structure */
-.leaderboard-table {
-  width: 100%;
-  border-collapse: collapse;
-}
+/* =========================
+   Table
+   ========================= */
+.leaderboard-table { width: 100%; }
 
 .leaderboard-header {
   display: grid;
   grid-template-columns: 70px 2fr 1fr 1fr;
-  padding: 1rem 1.5rem;
+  padding: 1rem 1.2rem;
   background: #fbfbfb;
   border-bottom: 1.5px solid #eee;
   font-weight: 600;
@@ -183,107 +179,59 @@
   display: grid;
   grid-template-columns: 70px 2fr 1fr 1fr;
   align-items: center;
-  padding: 1rem 1.5rem;
+  padding: 1rem 1.2rem;
   border-bottom: 1px solid #f5f5f5;
   transition: background-color .15s ease;
 }
-
-.leaderboard-row:last-child {
-  border-bottom: none;
-}
-
-.leaderboard-row:hover {
-  background: #fcfdfc;
-}
-
+.leaderboard-row:last-child { border-bottom: none; }
+.leaderboard-row:hover { background: #fcfdfc; }
 .leaderboard-row.current-user {
   background: #f1f8e9;
   border-left: 4px solid #66bb6a;
 }
 
-/* Cells */
-.rank-cell {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.medal {
-  font-size: 1.7rem;
-}
-
+/* cells */
+.rank-cell { display: flex; justify-content: center; align-items: center; }
+.medal { font-size: 1.7rem; }
 .rank-number {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #f3f3f3;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  color: #666;
-  font-size: 1.1rem;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: #f3f3f3; display: grid; place-items: center;
+  font-weight: 700; color: #666; font-size: 1.1rem;
 }
 
-.user-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-}
+.user-cell { display: flex; align-items: center; gap: 0.7rem; }
+.username { font-weight: 600; color: #2e7d32; font-size: 1.08rem; }
 
-.username {
-  font-weight: 600;
-  color: #2e7d32;
-  font-size: 1.08rem;
-}
+.points-cell, .streak-cell { display: flex; flex-direction: column; align-items: center; }
+.points-value, .streak-value { font-size: 1.25rem; font-weight: 800; color: #424242; }
+.points-label, .streak-label { font-size: 0.9rem; color: #757575; display: flex; align-items: center; }
+.streak-flame { margin-left: 0.2rem; font-size: 1.1rem; }
 
-.points-cell, .streak-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.points-value, .streak-value {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #424242;
-}
-
-.points-label, .streak-label {
-  font-size: 0.9rem;
-  color: #757575;
-  display: flex;
-  align-items: center;
-}
-
-.streak-flame {
-  margin-left: 0.2rem;
-  font-size: 1.1rem;
-}
-
-/* States */
+/* =========================
+   States
+   ========================= */
 .loading, .no-data, .error-message {
   text-align: center;
   padding: 2rem;
   color: #616161;
 }
-
 .error-message {
   background: #ffebee;
   color: #d32f2f;
   border-radius: 8px;
 }
 
-/* Responsive adjustments */
+/* =========================
+   Responsive tweaks
+   ========================= */
 @media (max-width: 600px) {
   .leaderboard-header,
   .leaderboard-row {
     grid-template-columns: 40px 1.5fr 1fr 1fr;
     font-size: 0.92rem;
-    padding: 0.7rem 0.7rem;
+    padding: 0.7rem 0.8rem;
   }
-  .level-card__header {
-    padding: 0.7rem 1rem;
-  }
+  .level-card__header { padding: 0.7rem 1rem 0.9rem; }
   .your-rank {
     flex-direction: column;
     align-items: flex-start;
@@ -291,21 +239,14 @@
     padding: 1rem 1rem;
     font-size: 1rem;
   }
-  .leaderboard-grid {
-    gap: 1rem;
-  }
-  .medal {
-    font-size: 1.2rem;
-  }
-  .rank-number {
-    width: 22px;
-    height: 22px;
-    font-size: 0.85rem;
-  }
-  .points-value, .streak-value {
-    font-size: 1rem;
-  }
-  .username {
-    font-size: 1rem;
-  }
+  .medal { font-size: 1.3rem; }
+  .rank-number { width: 24px; height: 24px; font-size: 0.9rem; }
+  .points-value, .streak-value { font-size: 1rem; }
+  .username { font-size: 1rem; }
+}
+
+/* Optional: only add horizontal scroll on very narrow screens */
+@media (max-width: 460px) {
+  .leaderboard-table { display: block; overflow-x: auto; }
+  .leaderboard-header, .leaderboard-row { min-width: 480px; }
 }

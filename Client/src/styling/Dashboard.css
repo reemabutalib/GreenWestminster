@@ -755,4 +755,197 @@
   .dashboard-avatar-img { width: 88px; height: 88px; }
 }
 
+/* ===== Subtle reveal-on-scroll (fail-safe) ===== */
+/* We ONLY hide items when JS has added .enable-reveal to <body> */
+@media (prefers-reduced-motion: no-preference) {
+  .enable-reveal [data-reveal] {
+    --reveal-duration: 520ms;
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity var(--reveal-duration) ease, transform var(--reveal-duration) ease;
+    will-change: transform, opacity;
+  }
+  .enable-reveal [data-reveal="left"]  { transform: translateX(-16px); }
+  .enable-reveal [data-reveal="right"] { transform: translateX(16px); }
+
+  .enable-reveal [data-reveal].is-revealed {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Never use attr() here; it isn’t widely supported for custom properties. */
+
+
+/* JS helper to read data-reveal-delay (no extra code needed) */
+[data-reveal].is-revealed {
+  --reveal-delay: attr(data-reveal-delay ms);
+}
+
+/* ===== Micro-interactions / polish ===== */
+
+/* Cards lift slightly on hover */
+.chart-card,
+.level-card,
+.impact-card,
+.pending-activities-section .approved-item,
+.user-challenges-list .challenge-item {
+  transition: transform .18s ease, box-shadow .22s ease;
+}
+.chart-card:hover,
+.level-card:hover,
+.impact-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(44,62,80,0.10);
+}
+
+/* Progress bar: smooth fill & soft glow when value changes */
+.progress-fill {
+  transition: width 600ms cubic-bezier(.22,.61,.36,1), box-shadow .3s ease;
+}
+.progress-fill:hover { box-shadow: 0 0 0 6px rgba(76,175,80,.12) inset; }
+
+/* Status badges: tiny pulse on hover */
+.status.in-progress,
+.status.approved,
+.status.pending,
+.status.rejected {
+  transition: transform .08s ease;
+}
+.status:hover { transform: translateY(-1px) scale(1.02); }
+
+/* Toast: slide & fade in/out */
+.toast {
+  animation: toast-in .22s ease-out, toast-out .2s ease-in 2.8s forwards;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes toast-out {
+  to { opacity: 0; transform: translateY(8px); }
+}
+
+/* Approved list: a soft highlight when it appears */
+.approved-item {
+  position: relative;
+  overflow: hidden;
+}
+.approved-item::after {
+  content:"";
+  position:absolute; inset:0;
+  background: linear-gradient(90deg, rgba(200,230,201,0) 0%, rgba(200,230,201,.45) 50%, rgba(200,230,201,0) 100%);
+  transform: translateX(-100%);
+  pointer-events:none;
+}
+.approved-item:hover::after {
+  animation: sheen 800ms ease;
+}
+@keyframes sheen {
+  to { transform: translateX(100%); }
+}
+
+/* Dashboard header avatar: gentle hover */
+.dashboard-avatar-img { transition: transform .2s ease, box-shadow .2s ease; }
+.dashboard-avatar-img:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(46,125,50,.18);
+}
+
+/* Buttons: slight press feedback */
+button, .cta-btn, .approved-gotit {
+  transition: transform .06s ease, box-shadow .12s ease, background .2s ease, opacity .2s ease;
+}
+button:active, .cta-btn:active, .approved-gotit:active { transform: translateY(1px); }
+
+/* Skeleton shimmer for your loading container (optional) */
+.loading-container .loading {
+  background: linear-gradient(90deg, #f1f8f4 25%, #e6f2ea 37%, #f1f8f4 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+  color: transparent;
+  border-radius: 8px;
+  height: 16px;
+  width: 140px;
+  margin: 24px auto;
+}
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+/* Add this at the end of your file for cleaner tips section */
+.tips-section {
+  padding: 2rem 1.5rem;
+  background: #f8fff8;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(44,132,85,.06);
+  margin-bottom: 2rem;
+}
+
+.tips-section .section-header h3 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: #2e7d32;
+  margin-bottom: 1.5rem;
+}
+
+.tips-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.tip-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(44,132,85,.04);
+  padding: 1.5rem 2rem;
+  margin-bottom: 0;
+}
+
+.tip-card h4 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #2e7d32;
+  margin-bottom: 1rem;
+}
+
+.tip-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tip-card li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 1.15rem;
+  margin-bottom: 0.75rem;
+  color: #222;
+}
+
+.tip-card li:last-child {
+  margin-bottom: 0;
+}
+
+.tip-card li::before {
+  content: "🌱";
+  margin-right: 0.5rem;
+  font-size: 1.15rem;
+}
+
+@media (max-width: 768px) {
+  .tips-section {
+    padding: 1rem 0.5rem;
+  }
+  .tip-card {
+    padding: 1rem;
+  }
+  .tips-container {
+    gap: 1rem;
+  }
+}
+
 

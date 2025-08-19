@@ -87,3 +87,25 @@
     font-size: 1.5rem;
   }
 }
+
+.login-container{
+  border:1px solid var(--border, #e3efe7);
+  border-radius: 20px;
+  box-shadow: 0 12px 32px rgba(44,132,85,.08);
+}
+.login-container input{
+  border-radius: 14px;
+  border:1.5px solid var(--border, #e3efe7);
+  background:#fbfefc;
+}
+.login-container input:focus{
+  border-color:#4CAF50;
+  box-shadow: 0 0 0 3px rgba(76,175,80,.25);
+}
+.login-container button{
+  border-radius: 999px;
+  background:#6ac47e;
+  border:1.5px solid #6ac47e;
+  font-weight:800;
+}
+.login-container button:hover{ background:#2b7a4b; border-color:#2b7a4b; }
