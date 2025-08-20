@@ -5,6 +5,7 @@ import HomePage from "../HomePage";
 
 export default function Landing() {
   const { currentUser, loading } = useAuth();
+  
   if (loading) return <div className="loading-auth">Loading…</div>;
   if (currentUser) {
     const to = currentUser.role === "Admin" ? "/admin/dashboard" : "/dashboard";

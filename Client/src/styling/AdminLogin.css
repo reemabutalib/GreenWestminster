@@ -109,3 +109,34 @@
   font-weight:800;
 }
 .login-container button:hover{ background:#2b7a4b; border-color:#2b7a4b; }
+
+/* Disabled states */
+.login-container input:disabled,
+.login-container button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Loading visual for the button */
+.login-container button.is-loading {
+  position: relative;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+/* Optional spinner after the text */
+.login-container button.is-loading::after {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-left: 10px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.6);
+  border-top-color: #fff;
+  animation: admin-spin .8s linear infinite;
+  vertical-align: -3px;
+}
+
+@keyframes admin-spin {
+  to { transform: rotate(360deg); }
+}
