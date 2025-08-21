@@ -1,3 +1,10 @@
+window.IntersectionObserver = class {
+  constructor() {}
+  observe() {}
+  disconnect() {}
+  unobserve() {}
+};
+
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import HomePage from '../components/HomePage';

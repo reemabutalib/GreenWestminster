@@ -240,11 +240,12 @@ useEffect(() => {
             "Food Choices": "Food"
           };
           const mergedCategoryCounts = allCategories.map(cat => {
-            const match = statsData.categoryCounts.find(
-              c => categoryMap[c.name] === cat || c.name === cat
-            );
-            return { name: cat, value: match ? match.value : 0 };
-          });
+  const counts = statsData.categoryCounts || [];
+  const match = counts.find(
+    c => categoryMap[c.name] === cat || c.name === cat
+  );
+  return { name: cat, value: match ? match.value : 0 };
+});
           const sorted = mergedCategoryCounts.sort((a, b) => a.value - b.value);
           setLowTipCategories(sorted.slice(0, 2).map(c => c.name));
         }
