@@ -948,4 +948,236 @@ button:active, .cta-btn:active, .approved-gotit:active { transform: translateY(1
   }
 }
 
+/* ...existing code... */
+
+/* Level Card Layout: Medal & Badge left, Progress bar right */
+.level-card {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 1rem;
+}
+
+.level-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100px;
+  margin-right: 2rem;
+}
+
+.badge-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.badge-text {
+  background: #2e7d32;
+  color: white;
+  font-weight: bold;
+  font-size: 1.2rem;
+  padding: 0.5rem 1rem;
+  border-radius: 50px;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.level-progress {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.progress-text {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.level-title {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #2e7d32;
+  margin-right: 1rem;
+}
+
+.points-to-next, .max-level {
+  font-size: 0.95rem;
+  color: #666;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 12px;
+  background: #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #4caf50;
+  border-radius: 6px;
+  transition: width 0.5s ease-in-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .level-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .level-badge {
+    margin-right: 0;
+    margin-bottom: 1rem;
+  }
+  .progress-text {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}
+
+/* ---- Level section: medal + level left, long progress row right ---- */
+.level-card{
+  display:grid;
+  grid-template-columns:max-content 1fr; /* left stays snug, right stretches */
+  align-items:center;
+  column-gap:24px;
+  background:#fff;
+  border-radius:8px;
+  padding:1.5rem;
+  box-shadow:0 2px 4px rgba(0,0,0,.1);
+  margin-top:1rem;
+}
+
+.level-badge{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;   /* lock to the LEFT */
+  text-align:left;
+  margin:0;                 /* no extra push */
+  min-width:110px;          /* optional: keeps it steady */
+}
+
+.badge-icon{ font-size:2.25rem; margin:0 0 .35rem 0; }
+.badge-text{
+  background:#2e7d32; color:#fff; font-weight:700;
+  font-size:1.1rem; padding:.4rem .9rem; border-radius:999px;
+}
+
+/* Right side fills the rest of the row */
+.level-progress{
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  gap:.5rem;
+}
+
+/* Single long row: title on the left, “X points to …” on the far right */
+.progress-text{
+  display:flex;
+  align-items:center;
+  justify-content:space-between; /* spread out across the bar */
+  gap:1rem;
+  flex-wrap:wrap;                /* keeps it tidy when narrow */
+}
+
+.level-title{
+  font-weight:700; font-size:1.1rem; color:#2e7d32;
+}
+.points-to-next{ font-size:.95rem; color:#666; }
+.max-level{ font-size:.95rem; color:#ff9800; font-weight:700; }
+
+/* Full-width progress bar */
+.progress-bar{
+  width:100%;
+  height:12px;
+  background:#e0e0e0;
+  border-radius:6px;
+  overflow:hidden;
+}
+.progress-fill{
+  height:100%;
+  background:#4caf50;
+  border-radius:6px;
+  transition:width .5s ease-in-out;
+}
+
+/* Stack neatly on small screens */
+@media (max-width:768px){
+  .level-card{ grid-template-columns:1fr; row-gap:12px; }
+  .level-badge{ align-items:center; text-align:center; }
+  .progress-text{ justify-content:center; }
+}
+
+/* === Modal layout & scrolling === */
+.modal-overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  display: grid;                 /* centers while still allowing scroll */
+  place-items: center;
+  padding: 16px;                 /* breathing room on small screens */
+  z-index: 1000;
+  overflow: auto;                /* allow the overlay itself to scroll if needed */
+  -webkit-overflow-scrolling: touch;
+}
+
+.completion-modal{
+  width: min(720px, 100%);
+  max-height: 90vh;              /* key: cap height to viewport */
+  overflow: auto;                /* key: inner scroll for long content */
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.18);
+  -webkit-overflow-scrolling: touch;   /* iOS smooth scroll */
+  overscroll-behavior: contain;
+}
+
+/* Make the action buttons always reachable */
+.modal-actions{
+  position: sticky;
+  bottom: -1px;                  /* stick to bottom inside the scroll area */
+  background: #fff;
+  padding-top: 12px;
+  margin-top: 16px;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* Prevent previews/inputs from blowing up the layout */
+.completion-modal img,
+.completion-modal .image-preview{
+  max-width: 100%;
+  max-height: 40vh;              /* scroll the preview if it’s tall */
+  height: auto;
+  display: block;
+  overflow: auto;
+  border-radius: 8px;
+}
+
+.completion-modal textarea{
+  max-height: 30vh;
+  resize: vertical;
+}
+
+/* Optional: lock background scroll while modal is open */
+body.modal-open{
+  overflow: hidden;
+}
+
+
+
 

@@ -15,8 +15,103 @@ const EventsPage = () => {
       ? ''  // dev -> use Vite proxy
       : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
   ).replace(/\/$/, '');
+
+  const IS_DEV = import.meta.env.DEV;
+
+const BACKEND_ORIGIN =
+  (import.meta.env.VITE_API_URL || '').replace(/\/$/, '') ||
+  (import.meta.env.DEV ? 'http://localhost:5138' : '');
+
+  function normalizeEventImageUrl(raw) {
+  if (!raw) return '';
+
+  // helper: extract "/uploads/..." from any string
+  const toUploadsPath = (s) => {
+    if (!s) return '';
+    if (s.includes('/uploads/')) return s.slice(s.indexOf('/uploads/'));
+    // treat bare filename as an event image
+    const filename = s.replace(/^\/+/, '');
+    return `/uploads/events/${filename}`;
+  };
+
+  try {
+    // Use window.origin to resolve relative paths too
+    const u = new URL(raw, window.location.origin);
+
+    // If the host is localhost (with or without port) and we have an uploads path,
+    // convert to a relative path so Vite proxy kicks in during dev.
+    if (u.hostname === 'localhost' && u.pathname.includes('/uploads/')) {
+      const path = toUploadsPath(u.pathname);
+      return IS_DEV ? path : `${API_BASE_URL}${path}`;
+    }
+
+    // If this is already an absolute URL to your API domain, just upgrade http if needed
+    if (location.protocol === 'https:' && u.protocol === 'http:') {
+      u.protocol = 'https:';
+    }
+    return u.toString();
+  } catch {
+    // If constructing URL fails, treat it as relative/filename
+    const path = toUploadsPath(raw);
+    return IS_DEV ? path : `${API_BASE_URL}${path}`;
+  }
+}
+
+// Turn whatever the server sent into a safe, loadable URL.
+function normalizeImageUrl(url) {
+  if (!url) return '';
+
+  // If absolute: upgrade http->https when the page is https
+  if (/^https?:\/\//i.test(url)) {
+    if (window.location.protocol === 'https:' && url.startsWith('http://')) {
+      return url.replace(/^http:\/\//i, 'https://');
+    }
+    return url;
+  }
+
+  // If relative: ensure we hit the backend origin (works in dev & prod)
+  return `${BACKEND_ORIGIN}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+/**
+ * Make any backend-provided image URL safe & absolute.
+ * - Accepts absolute (http/https), relative (/uploads/...), or bare filename.
+ * - Rewrites http->https when page is https.
+ * - Rewrites any "localhost" host to your production API host in prod.
+ */
+function normalizeEventImageUrl(raw) {
+  if (!raw) return '';
+
+  // If absolute
+  if (/^https?:\/\//i.test(raw)) {
+    // In prod, if data contains localhost, replace with your API host
+    if (!import.meta.env.DEV && /\/\/localhost(:\d+)?\//i.test(raw)) {
+      const path = raw.substring(raw.indexOf('/uploads/')); // keep path from /uploads
+      return `${API_BASE_URL}${path}`;
+    }
+    // Avoid mixed content when the page is https
+    if (location.protocol === 'https:' && raw.startsWith('http://')) {
+      return raw.replace(/^http:\/\//i, 'https://');
+    }
+    return raw;
+  }
+
+  // If relative and already has /uploads/
+  if (raw.includes('/uploads/')) {
+    const pathFromUploads = raw.slice(raw.indexOf('/uploads/')); // ensure it starts at /uploads
+    return API_BASE_URL ? `${API_BASE_URL}${pathFromUploads}` : pathFromUploads;
+  }
+
+  // Bare filename → assume it lives in /uploads/events/<file>
+  const filename = raw.replace(/^\/+/, '');
+  return API_BASE_URL
+    ? `${API_BASE_URL}/uploads/events/${filename}`
+    : `/uploads/events/${filename}`;
+}
   
   useEffect(() => {
+  console.log("Events sample", events.slice(0,2).map(e => e.imageUrl));
+
     const fetchEvents = async () => {
       try {
         setLoading(true);
@@ -154,11 +249,24 @@ const EventsPage = () => {
         <div className="events-grid">
           {events.map(event => (
             <div key={event.id} className="event-card">
-              {event.imageUrl && (
-                <div className="event-image">
-                  <img src={event.imageUrl} alt={event.title} />
-                </div>
-              )}
+  {event.imageUrl && (
+  <div className="event-image">
+    <img
+      src={normalizeEventImageUrl(event.imageUrl)}
+      alt={event.title}
+      onError={(e) => {
+        console.warn('Image failed', { raw: event.imageUrl, src: e.currentTarget.src });
+        // last-resort: if http and page is https, try upgrading
+        if (e.currentTarget.src.startsWith('http://') && location.protocol === 'https:') {
+          e.currentTarget.src = e.currentTarget.src.replace(/^http:\/\//, 'https://');
+        }
+      }}
+    />
+  </div>
+)}
+
+
+
               <div className="event-content">
                 <h3 className="event-title">{event.title}</h3>
                 <p className="event-date">

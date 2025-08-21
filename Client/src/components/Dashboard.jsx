@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { useAuth } from './context/UserContext';
 import '../styling/Dashboard.css';
 import StreakCounter from './StreakCounter';
@@ -71,16 +72,51 @@ const formatDateTime = (d) =>
     hour: '2-digit', minute: '2-digit'
   });
 
+/** Build a short " (saved …)" suffix using water/CO₂.
+ *  Preference: Water category -> water; otherwise -> CO₂; fall back to whatever exists.
+ */
+const formatImpactSuffix = (item) => {
+  const category = (item?.activity?.category || item?.category || '').toLowerCase();
+
+  const co2 =
+    item?.co2Reduced ??
+    item?.carbonImpact?.co2Reduced ??
+    item?.impact?.co2Reduced;
+
+  const water =
+    item?.waterSaved ??
+    item?.carbonImpact?.waterSaved ??
+    item?.impact?.waterSaved;
+
+  const co2Txt = (typeof co2 === 'number' && isFinite(co2) && co2 > 0)
+    ? `${Number(co2.toFixed(2))} kg CO₂`
+    : null;
+
+  const waterTxt = (typeof water === 'number' && isFinite(water) && water > 0)
+    ? `${water >= 100 ? Math.round(water) : Number(water.toFixed(1))} L water`
+    : null;
+
+  if (!co2Txt && !waterTxt) return '';
+
+  // Prefer by category
+  if (category.includes('water') && waterTxt) return ` (saved ${waterTxt})`;
+  if (!category.includes('water') && co2Txt) return ` (saved ${co2Txt})`;
+
+  // Fallback to whichever exists
+  return ` (saved ${waterTxt || co2Txt})`;
+};
+
 const Dashboard = () => {
   const { currentUser } = useAuth();
 
   // toast
   const [toast, setToast] = useState(null);
-  const showToast = (msg) => {
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((msg) => {
     setToast(msg);
-    window.clearTimeout(showToast._t);
-    showToast._t = window.setTimeout(() => setToast(null), 3000);
-  };
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  }, []);
 
   // core state
   const [userData, setUserData] = useState(null);
@@ -119,70 +155,59 @@ const Dashboard = () => {
 
   const token = useMemo(() => (currentUser?.token || localStorage.getItem('token') || ''), [currentUser]);
 
-// Reveal-on-scroll (fail-safe + handles late-mounted nodes)
-useEffect(() => {
-  const body = document.body;
-  body.classList.add('enable-reveal');
+  // Reveal-on-scroll (safe)
+  useEffect(() => {
+    const body = document.body;
+    body.classList.add('enable-reveal');
 
-  const prefersReduced =
-    window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    const prefersReduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 
-  // Helper: reveal immediately (fallback / reduced motion)
-  const revealAllNow = () => {
-    document.querySelectorAll('[data-reveal]').forEach((n) => {
-      n.classList.add('is-revealed');
-    });
-  };
+    const revealAllNow = () => {
+      document.querySelectorAll('[data-reveal]').forEach((n) => n.classList.add('is-revealed'));
+    };
 
-  if (prefersReduced || typeof IntersectionObserver === 'undefined') {
-    revealAllNow();
-    return () => body.classList.remove('enable-reveal');
-  }
-
-  // IO that reveals elements as they enter viewport
-  const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting) {
-          e.target.classList.add('is-revealed');
-          io.unobserve(e.target);
-        }
-      });
-    },
-    { threshold: 0.12, rootMargin: '0px 0px -10% 0px' }
-  );
-
-  // Observe any element we find (and don't re-observe already revealed)
-  const observe = (el) => {
-    if (!el || !(el instanceof Element)) return;
-    if (el.classList.contains('is-revealed')) return;
-    io.observe(el);
-  };
-
-  // Observe what exists now…
-  document.querySelectorAll('[data-reveal]').forEach(observe);
-
-  // …and also anything that appears later (after data finishes loading)
-  const mo = new MutationObserver((mutations) => {
-    for (const m of mutations) {
-      m.addedNodes.forEach((node) => {
-        if (!(node instanceof Element)) return;
-        if (node.hasAttribute('data-reveal')) observe(node);
-        node.querySelectorAll?.('[data-reveal]').forEach(observe);
-      });
+    if (prefersReduced || typeof IntersectionObserver === 'undefined') {
+      revealAllNow();
+      return () => body.classList.remove('enable-reveal');
     }
-  });
-  mo.observe(document.body, { childList: true, subtree: true });
 
-  // Cleanup
-  return () => {
-    mo.disconnect();
-    io.disconnect();
-    body.classList.remove('enable-reveal');
-  };
-}, []);
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('is-revealed');
+            io.unobserve(e.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -10% 0px' }
+    );
 
+    const observe = (el) => {
+      if (!el || !(el instanceof Element)) return;
+      if (el.classList.contains('is-revealed')) return;
+      io.observe(el);
+    };
 
+    document.querySelectorAll('[data-reveal]').forEach(observe);
+
+    const mo = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        m.addedNodes.forEach((node) => {
+          if (!(node instanceof Element)) return;
+          if (node.hasAttribute('data-reveal')) observe(node);
+          node.querySelectorAll?.('[data-reveal]').forEach(observe);
+        });
+      }
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      mo.disconnect();
+      io.disconnect();
+      body.classList.remove('enable-reveal');
+    };
+  }, []);
 
   /* =======================
      Data fetching
@@ -206,7 +231,7 @@ useEffect(() => {
         const levelRes = await fetch(`${API_BASE_URL}/api/users/${userId}/level-info`, { headers: authHeader });
         if (levelRes.ok) setLevelInfo(await levelRes.json());
 
-        // impact (Approved)
+        // impact (Approved aggregate)
         const impactRes = await fetch(`${API_BASE_URL}/api/activities/users/${userId}/carbon-impact`, { headers: authHeader });
         if (impactRes.ok) {
           const impactData = await impactRes.json();
@@ -240,12 +265,12 @@ useEffect(() => {
             "Food Choices": "Food"
           };
           const mergedCategoryCounts = allCategories.map(cat => {
-  const counts = statsData.categoryCounts || [];
-  const match = counts.find(
-    c => categoryMap[c.name] === cat || c.name === cat
-  );
-  return { name: cat, value: match ? match.value : 0 };
-});
+            const counts = statsData.categoryCounts || [];
+            const match = counts.find(
+              c => (categoryMap[c.name] === cat) || c.name === cat
+            );
+            return { name: cat, value: match ? match.value : 0 };
+          });
           const sorted = mergedCategoryCounts.sort((a, b) => a.value - b.value);
           setLowTipCategories(sorted.slice(0, 2).map(c => c.name));
         }
@@ -286,15 +311,23 @@ useEffect(() => {
       .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
   }, [allCompletions, dismissedApproved]);
 
+  // "Got it" → toast w/ points + impact, and persist dismissal
   const dismissApproved = (item) => {
+     console.log("Got it clicked", item);
     const next = new Set(dismissedApproved);
     next.add(item.id);
     setDismissedApproved(next);
     setIdSet('approvedDismissedIds', next);
 
-    const pts = Number(item.pointsEarned || 0);
+    const pts = Number(item.pointsEarned ?? item.activity?.points ?? 0);
     const title = item.activity?.title || 'your activity';
-    showToast(pts > 0 ? `+${pts} points for “${title}” 🎉` : `Marked as read: “${title}”`);
+    const impact = formatImpactSuffix(item);
+
+    showToast(
+      pts > 0
+        ? `You received ${pts} point${pts === 1 ? '' : 's'} for “${title}” 🎉${impact}`
+        : `Marked as read: “${title}”${impact}`
+    );
   };
 
   const inProgressChallenges = useMemo(() => {
@@ -435,10 +468,10 @@ useEffect(() => {
         <div className="section-header"><h3>Your Level</h3></div>
         <div className="level-card">
           <div className="level-badge">
-            <div className="badge-icon">
+            <span className="badge-icon" role="img" aria-label={`${levelInfo.currentLevel} Medal`}>
               {({ Bronze: "🥉", Silver: "🥈", Gold: "🥇", Platinum: "🏆" }[levelInfo.currentLevel] || "👑")}
-            </div>
-            <div className="badge-text">{levelInfo.currentLevel}</div>
+            </span>
+            <span className="badge-text">{levelInfo.currentLevel}</span>
           </div>
           <div className="level-progress">
             <div className="progress-text">
@@ -666,12 +699,43 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div className="toast toast-success">
-          {toast}
-        </div>
-      )}
+      {/* Toast (portal so it always shows above everything) */}
+     {createPortal(
+  <div
+    id="gw-toast-root"
+    style={{
+      position: 'fixed',
+      right: 18,
+      bottom: 18,
+      zIndex: 2147483647,      // max it out
+      pointerEvents: 'none',   // never block clicks
+      display: 'grid',
+      gap: 8,
+    }}
+  >
+    {toast && (
+      <div
+        role="status"
+        aria-live="polite"
+        style={{
+          background: '#1b5e20',
+          color: '#fff',
+          padding: '12px 14px',
+          borderRadius: 10,
+          fontWeight: 700,
+          boxShadow: '0 10px 24px rgba(0,0,0,.18)',
+          maxWidth: '80vw',
+          opacity: 1,
+          transform: 'translateY(0)',
+          transition: 'opacity 150ms ease, transform 150ms ease',
+        }}
+      >
+        {toast}
+      </div>
+    )}
+  </div>,
+  document.body
+)}
     </div>
   );
 };

@@ -107,7 +107,8 @@ namespace Server.Controllers
                     {
                         await image.CopyToAsync(stream);
                     }
-                    return $"{requestScheme}://{requestHost}/uploads/events/{imageFileName}";
+                    return $"/uploads/events/{imageFileName}";
+
                 }
 
                 var createdEvent = await _eventsService.CreateEventAsync(eventDto, ImageHandler, requestScheme, requestHost);

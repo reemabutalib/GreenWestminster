@@ -14,9 +14,14 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:5138',
         changeOrigin: true,
-        secure: false
-      }
-    }
+        secure: false,
+      },
+      '/uploads': {
+        target: 'http://localhost:5138',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   build: {
     rollupOptions: {
@@ -29,5 +34,5 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-  }
+  },
 });

@@ -23,10 +23,10 @@ const ActivitiesPage = () => {
   const [pendingActivities, setPendingActivities] = useState([]);
 
   const API_BASE_URL = (
-  import.meta.env.DEV
-    ? '' 
-    : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
-).replace(/\/$/, '');
+    import.meta.env.DEV
+      ? ''
+      : (import.meta.env.VITE_API_URL || 'https://greenwestminster.onrender.com')
+  ).replace(/\/$/, '');
   const userId = localStorage.getItem('userId') || 1;
 
   useEffect(() => {
@@ -40,18 +40,6 @@ const ActivitiesPage = () => {
     localStorage.setItem('pendingActivities', JSON.stringify(pendingActivities));
   }, [pendingActivities]);
 
-  const getPropertyValue = (obj, propNames) => {
-    if (!obj) return false;
-    for (const prop of propNames) {
-      if (obj[prop] !== undefined) {
-        if (typeof obj[prop] === 'string') return obj[prop].toLowerCase() === 'true';
-        if (typeof obj[prop] === 'number') return obj[prop] === 1;
-        return Boolean(obj[prop]);
-      }
-    }
-    return false;
-  };
-
   useEffect(() => {
     const fetchActivities = async () => {
       try {
@@ -63,29 +51,30 @@ const ActivitiesPage = () => {
         setCategories(uniqueCategories);
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching activities:', err);
         setError(err.message);
         setLoading(false);
       }
     };
-
     fetchActivities();
   }, [API_BASE_URL]);
 
+  useEffect(() => {
+    if (showCompletionModal) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => document.body.classList.remove('modal-open');
+  }, [showCompletionModal]);
+
   const filteredActivities = activities.filter(activity => {
     const matchesCategory = activeCategory === 'all' || activity.category === activeCategory;
-
     let matchesFrequency = true;
     if (activeFrequency === 'weekly') {
-      if (activity.isWeekly !== undefined) {
-        matchesFrequency = Boolean(activity.isWeekly);
-      } else {
-        matchesFrequency = activity.isDaily === false;
-      }
+      matchesFrequency = activity.isWeekly !== undefined ? Boolean(activity.isWeekly) : activity.isDaily === false;
     } else if (activeFrequency === 'daily') {
       matchesFrequency = Boolean(activity.isDaily);
     }
-
     return matchesCategory && matchesFrequency;
   });
 
@@ -111,47 +100,33 @@ const ActivitiesPage = () => {
   };
 
   const getConfirmationText = (activity) => {
-    if (getPropertyValue(activity, ['isDaily', 'isdaily', 'IsDaily', 'ISDAILY']))
-      return "I confirm I completed this activity today";
-    if (getPropertyValue(activity, ['isWeekly', 'isweekly', 'IsWeekly', 'ISWEEKLY']))
-      return "I confirm I completed this activity this week";
+    if (activity.isDaily) return "I confirm I completed this activity today";
+    if (activity.isWeekly) return "I confirm I completed this activity this week";
     return "I confirm I completed this activity";
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!confirmationChecked) {
-      const timeframe = getPropertyValue(selectedActivity, ['isDaily']) ? "today" : "this week";
-      alert(`Please confirm that you completed this activity ${timeframe}.`);
+      alert("Please confirm that you completed this activity.");
       return;
     }
-
     if (!completedAt) {
       alert("Please select the date you completed the activity.");
       return;
     }
-
-    // Quantity must be a positive number
     const qty = Number(quantity);
     if (Number.isNaN(qty) || qty <= 0) {
       alert("Please enter a valid quantity greater than 0.");
       return;
     }
-
-    // Image is required now
     if (!image) {
       alert("Please upload a photo as evidence.");
       return;
     }
-
     setSubmitting(true);
-
     try {
       const isoDate = new Date(completedAt).toISOString();
-      console.log("📅 Submitting completedAt:", completedAt);
-      console.log("📦 ISO formatted date:", isoDate);
-
       const formData = new FormData();
       formData.append('userId', userId);
       formData.append('completedAt', isoDate);
@@ -169,47 +144,20 @@ const ActivitiesPage = () => {
         throw new Error(errorData.message || 'Failed to complete activity');
       }
 
-      const result = await response.json();
-
-      // Points logic
-      const co2Points = Math.max(0, Math.floor((Number(result.co2eReduction) || 0) / 0.5));
-      let waterPoints = 0;
-      let waterSaved = result.waterSaved || 0;
-
-      // Check if this is a water activity
-      if (
-        selectedActivity.category &&
-        selectedActivity.category.toLowerCase().includes('water')
-      ) {
-        // 1 point per 10 liters saved (adjust as needed)
-        waterPoints = Math.floor(Number(waterSaved) / 10);
-      }
-
-      const estimatedPoints = co2Points + waterPoints;
-
-      alert(
-        `Activity submitted for review!\n` +
-        `CO₂ Reduction: ${Number(result.co2eReduction || 0).toFixed(2)} kg\n` +
-        (waterSaved > 0 ? `Water Saved: ${Number(waterSaved).toFixed(2)} liters\n` : '') +
-        `Estimated points on approval: ${estimatedPoints}`
-      );
-
-      // Avoid duplicate pending IDs
+      await response.json();
+      alert("Activity submitted for review!");
       setPendingActivities(prev => {
         const set = new Set(prev);
         set.add(selectedActivity.id);
         return Array.from(set);
       });
-
       setShowCompletionModal(false);
     } catch (err) {
-      console.error('❌ Error completing activity:', err);
       alert(`Error: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
   };
-
 
   if (loading) return <div className="loading">Loading...</div>;
   if (error) return <div className="error">Error: {error}</div>;
@@ -264,11 +212,10 @@ const ActivitiesPage = () => {
       </div>
 
       {showCompletionModal && selectedActivity && (
-        <div className="modal-overlay">
-          <div className="completion-modal">
+        <div className="modal-overlay" onClick={() => setShowCompletionModal(false)}>
+          <div className="completion-modal" onClick={e => e.stopPropagation()}>
             <h3>Complete Activity</h3>
             <h4>{selectedActivity.title}</h4>
-
             <form onSubmit={handleSubmit}>
               <div className="confirmation-checkbox">
                 <input
@@ -279,7 +226,6 @@ const ActivitiesPage = () => {
                 />
                 <label htmlFor="confirmation">{getConfirmationText(selectedActivity)}</label>
               </div>
-
               <div className="form-group">
                 <label htmlFor="completedAt">Date Completed</label>
                 <input
@@ -290,8 +236,6 @@ const ActivitiesPage = () => {
                   required
                 />
               </div>
-
-
               <div className="form-group">
                 <label htmlFor="notes">Notes (optional)</label>
                 <textarea
@@ -302,7 +246,6 @@ const ActivitiesPage = () => {
                   rows="3"
                 ></textarea>
               </div>
-
               <div className="form-group">
                 <label htmlFor="quantity">Quantity (required for carbon impact)</label>
                 <input
@@ -316,7 +259,6 @@ const ActivitiesPage = () => {
                   required
                 />
               </div>
-
               <div className="form-group">
                 <label htmlFor="image">Upload Image (required)</label>
                 <input
@@ -335,7 +277,6 @@ const ActivitiesPage = () => {
                   </div>
                 )}
               </div>
-
               <div className="modal-actions">
                 <button type="button" className="cancel-btn" onClick={() => setShowCompletionModal(false)} disabled={submitting}>Cancel</button>
                 <button
