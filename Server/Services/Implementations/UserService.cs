@@ -110,19 +110,20 @@ public async Task<IEnumerable<LeaderboardUserDto>> GetLeaderboardAsync(string ti
         .Where(ac => ac.UserId == id && ac.ReviewStatus == "Approved")
         .ToListAsync();
 
-    // Adjust these categories to match your real values
-    var treesPlanted = completions.Count(a => a.Activity.Category == "Tree Planting");
-    var wasteRecycled = completions.Count(a => a.Activity.Category == "Recycling") * 0.5;
-    var sustainableCommutes = completions.Count(a => a.Activity.Category == "Sustainable Transport");
-    var waterSaved = completions.Count(a => a.Activity.Category == "Water Conservation") * 50;
+    var water = completions.Count(a => a.Activity.Category == "Water Conservation");
+var energy = completions.Count(a => a.Activity.Category == "Energy Saving");
+var transport = completions.Count(a => a.Activity.Category == "Sustainable Transport");
+var waste = completions.Count(a => a.Activity.Category == "Recycling" || a.Activity.Category == "Waste Reduction");
+var food = completions.Count(a => a.Activity.Category == "Food Choices");
 
-    return new
-    {
-        TreesPlanted = treesPlanted,
-        WasteRecycled = wasteRecycled,
-        SustainableCommutes = sustainableCommutes,
-        WaterSaved = waterSaved
-    };
+return new
+{
+    Water = water,
+    Energy = energy,
+    Transport = transport,
+    Waste = waste,
+    Food = food
+};
 }
 
 

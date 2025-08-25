@@ -21,6 +21,7 @@ const ActivitiesPage = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const [pendingActivities, setPendingActivities] = useState([]);
+  const [completedActivities, setCompletedActivities] = useState([]);
 
   const API_BASE_URL = (
     import.meta.env.DEV
@@ -66,6 +67,22 @@ const ActivitiesPage = () => {
     }
     return () => document.body.classList.remove('modal-open');
   }, [showCompletionModal]);
+
+  // Fetch completed activities from backend
+useEffect(() => {
+  const fetchCompletions = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/completions`);
+      if (!response.ok) throw new Error('Failed to fetch completions');
+      const data = await response.json();
+      // Assume data is an array of approved activity IDs
+      setCompletedActivities(data.map(c => c.activityId));
+    } catch {
+      // handle error if needed
+    }
+  };
+  fetchCompletions();
+}, [API_BASE_URL, userId, showCompletionModal]);
 
   const filteredActivities = activities.filter(activity => {
     const matchesCategory = activeCategory === 'all' || activity.category === activeCategory;
@@ -203,7 +220,8 @@ const ActivitiesPage = () => {
               key={activity.id || activity.Id}
               activity={activity}
               onCompleteClick={handleCompleteClick}
-              isPending={pendingActivities.includes(activity.id)}
+              isPending={pendingActivities.includes(activity.id) && !completedActivities.includes(activity.id)}
+              isCompleted={completedActivities.includes(activity.id)}
             />
           ))
         ) : (

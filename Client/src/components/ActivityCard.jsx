@@ -1,6 +1,6 @@
 import '../styling/ActivityCard.css';
 
-const ActivityCard = ({ activity, onCompleteClick, isPending }) => {
+const ActivityCard = ({ activity, onCompleteClick, isPending, isCompleted }) => {
   // Helper: truthy variations
   const isTrueProperty = (obj, propNames) => {
     if (!obj) return false;
@@ -47,12 +47,10 @@ const ActivityCard = ({ activity, onCompleteClick, isPending }) => {
   const pointsLabel = isQuantityBased ? `~+${pointsVal}` : `+${pointsVal}`;
 
   return (
-    <div className={`activity-card ${isPending ? 'completed' : ''}`}>
-      {/* Category Tag */}
+    <div className={`activity-card ${isPending ? 'completed' : ''} ${isCompleted ? 'done' : ''}`}>
       <div className="card-tag">{activity.category}</div>
-
-      {/* Pending Review badge */}
-      {isPending && <div className="pending-status">⏳ Pending Review</div>}
+      {isCompleted && <div className="completed-status">✅ Completed</div>}
+      {isPending && !isCompleted && <div className="pending-status">⏳ Pending Review</div>}
 
       {/* Title & Description */}
       <h3>{activity.title}</h3>
@@ -81,9 +79,9 @@ const ActivityCard = ({ activity, onCompleteClick, isPending }) => {
       <button
         className="complete-btn"
         onClick={handleCompleteActivity}
-        disabled={isPending}
+        disabled={isPending || isCompleted}
       >
-        {isPending ? 'Pending Review' : 'Complete Activity'}
+        {isCompleted ? 'Completed' : isPending ? 'Pending Review' : 'Complete Activity'}
       </button>
     </div>
   );
