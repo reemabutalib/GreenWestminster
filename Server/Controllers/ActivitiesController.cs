@@ -221,34 +221,6 @@ public class ActivitiesController : ControllerBase
         }
     }
 
-    // GET: api/activities/category/waste-reduction
-    [HttpGet("category/{category}")]
-    public async Task<ActionResult<IEnumerable<object>>> GetActivitiesByCategory(string category)
-    {
-        try
-        {
-            _logger.LogInformation("Fetching activities by category: {Category}", category);
-            var activities = await _activitiesService.GetActivitiesByCategoryAsync(category);
-            var result = activities.Select(a => new
-            {
-                id = a.Id,
-                title = a.Title,
-                description = a.Description,
-                category = a.Category,
-                pointsValue = a.PointsValue,
-                isDaily = a.IsDaily,
-                isWeekly = a.IsWeekly,
-                isOneTime = a.IsOneTime
-            });
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while fetching activities by category: {Category}", category);
-            return StatusCode(500, new { message = $"An error occurred while retrieving activities for category: {category}", error = ex.Message });
-        }
-    }
-
     // GET: api/activities/daily
     [HttpGet("daily")]
     public async Task<ActionResult<IEnumerable<object>>> GetDailyActivities()
@@ -302,34 +274,6 @@ public class ActivitiesController : ControllerBase
         {
             _logger.LogError(ex, "Error occurred while fetching weekly activities");
             return StatusCode(500, new { message = "An error occurred while retrieving weekly activities", error = ex.Message });
-        }
-    }
-
-    // GET: api/activities/points-range?min=10&max=50
-    [HttpGet("points-range")]
-    public async Task<ActionResult<IEnumerable<object>>> GetActivitiesByPointsRange([FromQuery] int min = 0, [FromQuery] int max = int.MaxValue)
-    {
-        try
-        {
-            _logger.LogInformation("Fetching activities in points range: {Min} to {Max}", min, max);
-            var activities = await _activitiesService.GetActivitiesByPointsRangeAsync(min, max);
-            var result = activities.Select(a => new
-            {
-                id = a.Id,
-                title = a.Title,
-                description = a.Description,
-                category = a.Category,
-                pointsValue = a.PointsValue,
-                isDaily = a.IsDaily,
-                isWeekly = a.IsWeekly,
-                isOneTime = a.IsOneTime
-            });
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while fetching activities by points range: {Min} to {Max}", min, max);
-            return StatusCode(500, new { message = $"An error occurred while retrieving activities in points range: {min} to {max}", error = ex.Message });
         }
     }
 

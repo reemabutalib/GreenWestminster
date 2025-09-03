@@ -9,7 +9,7 @@ const AdminLogin = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,21 +29,23 @@ const AdminLogin = () => {
 
       if (result?.success && String(role).toLowerCase() === 'admin') {
         navigate('/admin/dashboard');
-        return; // component will unmount on route change
+        return; // success
       }
 
       if (result?.success) {
+        logout(); // clear any non-admin login
         setError("You don't have access to this page as you are not an admin.");
-      } else {
-        setError(result?.error || 'Invalid admin credentials');
+      return;
       }
+
+      setError(result?.error || 'Invalid admin credentials');
     } catch (err) {
       setError(err?.message || 'Something went wrong while logging in.');
     } finally {
       setIsLoading(false);
     }
   };
-
+  
   return (
     <div className="login-container">
       <h2>Admin Login</h2>
