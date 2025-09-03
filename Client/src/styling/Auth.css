@@ -201,3 +201,20 @@
   .auth-benefits, .auth-info{ padding: 1.25rem; }
   .form-options{ flex-direction: column; align-items: flex-start; gap:.6rem; }
 }
+
+/* -------- Logout button -------- */
+.logout-btn {
+  background: transparent;   
+  color: var(--ink);         
+  border: none;              
+  font-weight: 700;
+  cursor: pointer;
+  padding: .5rem 1rem;
+  border-radius: 6px;        
+}
+
+.logout-btn:hover {
+  background: var(--green-600); 
+  color: #fff;   
+}
+

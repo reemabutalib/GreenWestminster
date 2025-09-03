@@ -13,11 +13,11 @@
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 1000;
-  height: 72px;
+  min-height: 72px;
+  padding: .5rem .75rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 .75rem;
   background: #eef8f0;
   backdrop-filter: saturate(120%) blur(6px);
   border-bottom: 1px solid #e6f1e8;
@@ -153,3 +153,70 @@
   width: 1px;
   background-color: #cdebd9; /* soft green divider */
 }
+
+/* Keep the logo from exceeding the bar */
+.nav-logo-img{ height: 48px; }
+
+/* Mobile toggle (hidden by default; shown under 960px) */
+.nav-toggle{
+  display:none;
+  border:0;
+  background: transparent;
+  padding:.5rem;
+  border-radius:10px;
+}
+.nav-toggle:focus{ box-shadow: var(--ring); outline: none; }
+.nav-toggle-icon{
+  display:inline-block;
+  width:22px; height:2px; background: var(--ink);
+  position:relative;
+}
+.nav-toggle-icon::before,
+.nav-toggle-icon::after{
+  content:"";
+  position:absolute; left:0; right:0;
+  height:2px; background: var(--ink);
+}
+.nav-toggle-icon::before{ top:-6px; }
+.nav-toggle-icon::after{ top:6px; }
+
+/* Mobile panel */
+.mobile-menu{
+  position: fixed;
+  top: calc(var(--nav-h, 72px));
+  left: 0; right: 0;
+  background: var(--white);
+  border-bottom: 1px solid #e6f1e8;
+  box-shadow: 0 10px 20px rgba(0,0,0,.06);
+  padding: .75rem;
+  display: grid;
+  gap: .5rem;
+  max-height: 80vh;
+  overflow: auto;
+  z-index: 999; /* under the nav (1000) but above content */
+}
+.mobile-links{ display:grid; gap:.25rem; }
+.mobile-actions{
+  display:flex; gap:.5rem; padding-top:.5rem; border-top:1px solid #f0f5f2;
+}
+
+/* hide desktop links, show hamburger */
+@media (max-width: 960px){
+  .nav-links{ display:none; }
+  .nav-toggle{ display:inline-block; }
+  .nav-container{ min-height: 68px; }
+  .main-content{ padding-top: 76px; }
+}
+
+@media (max-width: 380px){
+  .nav-right .pill-ghost{ display:none; }
+}
+
+/* desktop dividers only on wide screens */
+@media (min-width: 961px){
+  .nav-links .nav-link { position: relative; margin: 0; padding: 0.5rem 1rem; }
+  .nav-links .nav-link:not(:last-child)::after {
+    content:""; position:absolute; right:0; top:25%; bottom:25%; width:1px; background:#cdebd9;
+  }
+}
+
