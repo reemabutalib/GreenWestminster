@@ -19,7 +19,7 @@ namespace Server.Services.Implementations
         private readonly IChallengeRepository _challengeRepository;
         private readonly ISustainableActivityRepository _activityRepository;
         private readonly AppDbContext _context;
-        
+
 
         public UserService(
             IUserRepository userRepository,
@@ -48,33 +48,33 @@ namespace Server.Services.Implementations
             return user;
         }
 
-public async Task<IEnumerable<LeaderboardUserDto>> GetLeaderboardAsync(string timeFrame)
-{
-    DateTime? start = null;
-    var now = DateTime.UtcNow;
+        public async Task<IEnumerable<LeaderboardUserDto>> GetLeaderboardAsync(string timeFrame)
+        {
+            DateTime? start = null;
+            var now = DateTime.UtcNow;
 
-    if (timeFrame == "month")
-    {
-        start = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-    }
-    else if (timeFrame == "week")
-    {
-        // ISO-ish week start: Monday
-        var offset = ((int)now.DayOfWeek + 6) % 7; // Mon=0 ... Sun=6
-        start = now.Date.AddDays(-offset);
-    }
+            if (timeFrame == "month")
+            {
+                start = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            }
+            else if (timeFrame == "week")
+            {
+                // ISO-ish week start: Monday
+                var offset = ((int)now.DayOfWeek + 6) % 7; // Mon=0 ... Sun=6
+                start = now.Date.AddDays(-offset);
+            }
 
-    // Sum approved points in the window
-    var approved = _context.ActivityCompletions
-        .Where(ac => ac.ReviewStatus == "Approved");
+            // Sum approved points in the window
+            var approved = _context.ActivityCompletions
+                .Where(ac => ac.ReviewStatus == "Approved");
 
-    if (start.HasValue)
-        approved = approved.Where(ac => ac.CompletedAt >= start.Value);
+            if (start.HasValue)
+                approved = approved.Where(ac => ac.CompletedAt >= start.Value);
 
-    var pointsByUser = await approved
-        .GroupBy(ac => ac.UserId)
-        .Select(g => new { UserId = g.Key, Points = g.Sum(x => x.PointsEarned) })
-        .ToListAsync();
+            var pointsByUser = await approved
+                .GroupBy(ac => ac.UserId)
+                .Select(g => new { UserId = g.Key, Points = g.Sum(x => x.PointsEarned) })
+                .ToListAsync();
 
             // 1. Get users from DB
             var users = await _context.Users
@@ -101,77 +101,77 @@ public async Task<IEnumerable<LeaderboardUserDto>> GetLeaderboardAsync(string ti
 
 
         public async Task<object?> GetUserStatsAsync(int id)
-{
-    var user = await _userRepository.GetByIdAsync(id);
-    if (user == null) return null;
+        {
+            var user = await _userRepository.GetByIdAsync(id);
+            if (user == null) return null;
 
-    var completions = await _context.ActivityCompletions
-        .Include(ac => ac.Activity)
-        .Where(ac => ac.UserId == id && ac.ReviewStatus == "Approved")
-        .ToListAsync();
+            var completions = await _context.ActivityCompletions
+                .Include(ac => ac.Activity)
+                .Where(ac => ac.UserId == id && ac.ReviewStatus == "Approved")
+                .ToListAsync();
 
-    var water = completions.Count(a => a.Activity.Category == "Water Conservation");
-var energy = completions.Count(a => a.Activity.Category == "Energy Saving");
-var transport = completions.Count(a => a.Activity.Category == "Sustainable Transport");
-var waste = completions.Count(a => a.Activity.Category == "Recycling" || a.Activity.Category == "Waste Reduction");
-var food = completions.Count(a => a.Activity.Category == "Food Choices");
+            var water = completions.Count(a => a.Activity.Category == "Water Conservation");
+            var energy = completions.Count(a => a.Activity.Category == "Energy Saving");
+            var transport = completions.Count(a => a.Activity.Category == "Sustainable Transport");
+            var waste = completions.Count(a => a.Activity.Category == "Recycling" || a.Activity.Category == "Waste Reduction");
+            var food = completions.Count(a => a.Activity.Category == "Food Choices");
 
-return new
-{
-    Water = water,
-    Energy = energy,
-    Transport = transport,
-    Waste = waste,
-    Food = food
-};
-}
+            return new
+            {
+                Water = water,
+                Energy = energy,
+                Transport = transport,
+                Waste = waste,
+                Food = food
+            };
+        }
 
 
         public async Task<IEnumerable<object>> GetRecentActivitiesAsync(int id)
-{
-    var activities = await _activityCompletionRepository.GetByUserIdAsync(id);
-
-    return activities
-        .OrderByDescending(ac => ac.CompletedAt)
-        .Take(10)
-        .Select(ac => new
         {
-            id = ac.Id,
-            completedAt = ac.CompletedAt,
-            pointsEarned = ac.PointsEarned,
-            reviewStatus = ac.ReviewStatus,
-            activity = new
-            {
-                id = ac.Activity.Id,
-                title = ac.Activity.Title,
-                description = ac.Activity.Description
-            }
-        })
-        .ToList();
-}
+            var activities = await _activityCompletionRepository.GetByUserIdAsync(id);
+
+            return activities
+                .OrderByDescending(ac => ac.CompletedAt)
+                .Take(10)
+                .Select(ac => new
+                {
+                    id = ac.Id,
+                    completedAt = ac.CompletedAt,
+                    pointsEarned = ac.PointsEarned,
+                    reviewStatus = ac.ReviewStatus,
+                    activity = new
+                    {
+                        id = ac.Activity.Id,
+                        title = ac.Activity.Title,
+                        description = ac.Activity.Description
+                    }
+                })
+                .ToList();
+        }
 
 
         public async Task<IEnumerable<object>> GetCompletedActivitiesAsync(int id, DateTime date)
-{
-    var activities = await _activityCompletionRepository.GetByUserIdAsync(id);
-    return activities
-        .Where(ac => ac.CompletedAt.Date == date.Date)
-        .OrderByDescending(ac => ac.CompletedAt)
-        .Select(ac => new
         {
-            id = ac.Id,
-            completedAt = ac.CompletedAt,
-            pointsEarned = ac.PointsEarned,
-            reviewStatus = ac.ReviewStatus,
-            activity = new
-            {
-                id = ac.Activity.Id,
-                title = ac.Activity.Title,
-                description = ac.Activity.Description
-            }
-        })
-        .ToList();
-}
+            var activities = await _activityCompletionRepository.GetByUserIdAsync(id);
+            return activities
+                .Where(ac => ac.CompletedAt.Date == date.Date)
+                .OrderByDescending(ac => ac.CompletedAt)
+                .Select(ac => new
+                {
+                    id = ac.Id,
+                    completedAt = ac.CompletedAt,
+                    pointsEarned = ac.PointsEarned,
+                    reviewStatus = ac.ReviewStatus,
+                    activity = new
+                    {
+                        id = ac.Activity.Id,
+                        title = ac.Activity.Title,
+                        description = ac.Activity.Description
+                    }
+                })
+                .ToList();
+        }
 
 
         public async Task<IEnumerable<object>> GetCompletedChallengesAsync(int id)
@@ -255,84 +255,84 @@ return new
         }
 
         public async Task<object?> GetActivityStatsAsync(int userId)
-{
-    var activities = await _context.ActivityCompletions
-        .Include(ac => ac.Activity)
-        .Where(ac => ac.UserId == userId && ac.ReviewStatus == "Approved")
-        .ToListAsync();
+        {
+            var activities = await _context.ActivityCompletions
+                .Include(ac => ac.Activity)
+                .Where(ac => ac.UserId == userId && ac.ReviewStatus == "Approved")
+                .ToListAsync();
 
-    var categoryCounts = activities
-        .GroupBy(ac => ac.Activity.Category)
-        .Select(g => new { name = g.Key, value = g.Count() })
-        .ToList();
+            var categoryCounts = activities
+                .GroupBy(ac => ac.Activity.Category)
+                .Select(g => new { name = g.Key, value = g.Count() })
+                .ToList();
 
-    var fourWeeksAgo = DateTime.UtcNow.AddDays(-28);
+            var fourWeeksAgo = DateTime.UtcNow.AddDays(-28);
 
-    // Mon=1 ... Sun=0 mapping you used; keep consistent
-    var dayAbbreviations = new Dictionary<int, string>
+            // Mon=1 ... Sun=0 mapping you used; keep consistent
+            var dayAbbreviations = new Dictionary<int, string>
     {
         { 1, "Mon" }, { 2, "Tue" }, { 3, "Wed" },
         { 4, "Thu" }, { 5, "Fri" }, { 6, "Sat" }, { 0, "Sun" }
     };
 
-    var weeklyActivity = activities
-        .Where(ac => ac.CompletedAt >= fourWeeksAgo)
-        .GroupBy(ac => ((int)ac.CompletedAt.DayOfWeek))
-        .Select(g => new { dayNum = g.Key, count = g.Count() })
-        .ToList();
+            var weeklyActivity = activities
+                .Where(ac => ac.CompletedAt >= fourWeeksAgo)
+                .GroupBy(ac => ((int)ac.CompletedAt.DayOfWeek))
+                .Select(g => new { dayNum = g.Key, count = g.Count() })
+                .ToList();
 
-    var formattedWeeklyActivity = Enumerable.Range(0, 7)
-        .Select(dayNum => new
-        {
-            day = dayAbbreviations[dayNum],
-            count = weeklyActivity.FirstOrDefault(wa => wa.dayNum == dayNum)?.count ?? 0
-        })
-        .OrderBy(d => d.day == "Sun" ? 7 :
-                      d.day == "Mon" ? 1 :
-                      d.day == "Tue" ? 2 :
-                      d.day == "Wed" ? 3 :
-                      d.day == "Thu" ? 4 :
-                      d.day == "Fri" ? 5 : 6)
-        .ToList();
+            var formattedWeeklyActivity = Enumerable.Range(0, 7)
+                .Select(dayNum => new
+                {
+                    day = dayAbbreviations[dayNum],
+                    count = weeklyActivity.FirstOrDefault(wa => wa.dayNum == dayNum)?.count ?? 0
+                })
+                .OrderBy(d => d.day == "Sun" ? 7 :
+                              d.day == "Mon" ? 1 :
+                              d.day == "Tue" ? 2 :
+                              d.day == "Wed" ? 3 :
+                              d.day == "Thu" ? 4 :
+                              d.day == "Fri" ? 5 : 6)
+                .ToList();
 
-    return new
-    {
-        categoryCounts,
-        weeklyActivity = formattedWeeklyActivity
-    };
-}
+            return new
+            {
+                categoryCounts,
+                weeklyActivity = formattedWeeklyActivity
+            };
+        }
 
 
         public async Task<IEnumerable<object>> GetPointsHistoryAsync(int userId)
-{
-    var fourWeeksAgo = DateTime.UtcNow.AddDays(-28).Date;
+        {
+            var fourWeeksAgo = DateTime.UtcNow.AddDays(-28).Date;
 
-    // Only approved completions contribute to points
-    var approved = await _context.ActivityCompletions
-        .Where(ac => ac.UserId == userId
-            && ac.ReviewStatus == "Approved"
-            && ac.CompletedAt >= fourWeeksAgo)
-        .Select(ac => new { ac.CompletedAt, ac.PointsEarned })
-        .ToListAsync();
+            // Only approved completions contribute to points
+            var approved = await _context.ActivityCompletions
+                .Where(ac => ac.UserId == userId
+                    && ac.ReviewStatus == "Approved"
+                    && ac.CompletedAt >= fourWeeksAgo)
+                .Select(ac => new { ac.CompletedAt, ac.PointsEarned })
+                .ToListAsync();
 
-    var weekStart = DateTime.UtcNow.Date.AddDays(-((int)DateTime.UtcNow.DayOfWeek + 6) % 7); // Monday this week
-    var starts = new[]
-    {
+            var weekStart = DateTime.UtcNow.Date.AddDays(-((int)DateTime.UtcNow.DayOfWeek + 6) % 7); // Monday this week
+            var starts = new[]
+            {
         weekStart.AddDays(-21),
         weekStart.AddDays(-14),
         weekStart.AddDays(-7),
         weekStart
     };
 
-    var pointsHistory = starts.Select((s, i) => new
-    {
-        date = $"Week {i + 1}",
-        points = approved.Where(ph => ph.CompletedAt.Date >= s && ph.CompletedAt.Date < s.AddDays(7))
-                         .Sum(ph => ph.PointsEarned)
-    }).ToList();
+            var pointsHistory = starts.Select((s, i) => new
+            {
+                date = $"Week {i + 1}",
+                points = approved.Where(ph => ph.CompletedAt.Date >= s && ph.CompletedAt.Date < s.AddDays(7))
+                                 .Sum(ph => ph.PointsEarned)
+            }).ToList();
 
-    return pointsHistory;
-}
+            return pointsHistory;
+        }
 
 
         public async Task<object> AddPointsAsync(int userId, int points)

@@ -59,9 +59,9 @@ namespace Server.Controllers
         [HttpGet("activity-completions")]
         [Authorize(Policy = "AdminPolicy")]
         public async Task<IActionResult> GetActivityCompletions(
-    [FromQuery] DateTime? startDate = null,
-    [FromQuery] DateTime? endDate = null,
-    [FromQuery] string? reviewStatus = null)
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null,
+        [FromQuery] string? reviewStatus = null)
         {
             try
             {

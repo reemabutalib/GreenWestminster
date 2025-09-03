@@ -106,7 +106,7 @@ namespace Server.Services.Implementations
 
             int totalActivities = allActivities.Count;
 
-            // Events (unchanged)
+            // Events
             var events = await _eventRepository.GetAllAsync();
             int totalEvents = events.Count;
             int upcomingEvents = events.Count(e => e.StartDate > DateTime.UtcNow);
